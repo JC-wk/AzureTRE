@@ -1,5 +1,5 @@
 import { Spinner, SpinnerSize } from "@fluentui/react";
-import { useEffect, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import { LoadingState } from "../../../models/loadingState";
 import {
   HttpMethod,
@@ -23,15 +23,20 @@ interface ResourceFormProps {
   templatePath: string;
   resourcePath: string;
   updateResource?: Resource;
-  onCreateResource: (operation: Operation) => void;
+  onCreateResource: (operation: Operation | void) => void;
   workspaceApplicationIdURI?: string;
+  formRef?: React.RefObject<any>;
+  hideSubmitButton?: boolean;
+  overrideTemplateVersion?: string;
+  isUpgrade?: boolean;
 }
 
-export const ResourceForm: React.FunctionComponent<ResourceFormProps> = (
+export const ResourceForm: React.FunctionComponent<ResourceFormProps> = forwardRef((
   props: ResourceFormProps,
+  ref,
 ) => {
   const [template, setTemplate] = useState<any | null>(null);
-  const [formData, setFormData] = useState({});
+  const [formData, setFormData] = useState<any>({});
   const [loading, setLoading] = useState(LoadingState.Loading as LoadingState);
   const [sendingData, setSendingData] = useState(false);
   const apiCall = useAuthApiCall();
@@ -40,13 +45,15 @@ export const ResourceForm: React.FunctionComponent<ResourceFormProps> = (
   useEffect(() => {
     const getFullTemplate = async () => {
       try {
+        let url = props.templatePath;
+        if (props.overrideTemplateVersion) {
+          url += `?version=${props.overrideTemplateVersion}`;
+        } else if (props.updateResource) {
+          url += `?is_update=true&version=${props.updateResource.templateVersion}`;
+        }
+
         // Get the full resource template containing the required parameters
-        const templateResponse = (await apiCall(
-          props.updateResource
-            ? `${props.templatePath}?is_update=true&version=${props.updateResource.templateVersion}`
-            : props.templatePath,
-          HttpMethod.Get,
-        )) as ResourceTemplate;
+        const templateResponse = (await apiCall(url, HttpMethod.Get)) as ResourceTemplate;
 
         // if it's an update, populate the form with the props that are available in the template
         if (props.updateResource) {
@@ -67,7 +74,13 @@ export const ResourceForm: React.FunctionComponent<ResourceFormProps> = (
     if (!template) {
       getFullTemplate();
     }
-  }, [apiCall, props.templatePath, template, props.updateResource]);
+  }, [apiCall, props.templatePath, template, props.updateResource, props.overrideTemplateVersion]);
+
+  useImperativeHandle(ref, () => ({
+    submit: () => {
+      createUpdateResource(formData);
+    }
+  }));
 
   const removeReadOnlyProps = (data: any, template: ResourceTemplate): any => {
     // flatten all the nested properties from across the template into a basic array we can iterate easily
@@ -107,6 +120,11 @@ export const ResourceForm: React.FunctionComponent<ResourceFormProps> = (
     let response;
     try {
       if (props.updateResource) {
+        const payload: any = { properties: data };
+        if (props.isUpgrade) {
+          payload.templateVersion = props.overrideTemplateVersion;
+        }
+
         const wsAuth =
           props.updateResource.resourceType === ResourceType.WorkspaceService ||
           props.updateResource.resourceType === ResourceType.UserResource;
@@ -114,7 +132,7 @@ export const ResourceForm: React.FunctionComponent<ResourceFormProps> = (
           props.updateResource.resourcePath,
           HttpMethod.Patch,
           wsAuth ? props.workspaceApplicationIdURI : undefined,
-          { properties: data },
+          payload,
           ResultType.JSON,
           undefined,
           undefined,
@@ -147,6 +165,10 @@ export const ResourceForm: React.FunctionComponent<ResourceFormProps> = (
     "ui:widget": "textarea",
   };
 
+  if (props.hideSubmitButton) {
+    uiSchema["ui:submitButtonOptions"] = { norender: true };
+  }
+
   // if no specific order has been set, set a generic one with the primary fields at the top
   if (!uiSchema["ui:order"] || uiSchema["ui:order"].length === 0) {
     uiSchema["ui:order"] = ["display_name", "description", "overview", "*"];
@@ -166,19 +188,19 @@ export const ResourceForm: React.FunctionComponent<ResourceFormProps> = (
               />
             ) : (
               <Form
+                liveOmit={true}
                 omitExtraData={true}
                 schema={template}
                 formData={formData}
                 uiSchema={uiSchema}
                 validator={validator}
                 onSubmit={(e: any) => createUpdateResource(e.formData)}
+                onChange={(e: any) => setFormData(e.formData)}
               />
             )}
           </div>
         )
       );
-    case LoadingState.Error:
-      return <ExceptionLayout e={apiError} />;
     case LoadingState.Error:
       return <ExceptionLayout e={apiError} />;
     default:
@@ -193,4 +215,4 @@ export const ResourceForm: React.FunctionComponent<ResourceFormProps> = (
         </div>
       );
   }
-};
+});
