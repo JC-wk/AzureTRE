@@ -174,7 +174,7 @@ export const CreateUpdateResource: React.FunctionComponent<
           templateName={selectedTemplate}
           templatePath={`${templateGetPath}/${selectedTemplate}`}
           resourcePath={resourcePath}
-          onCreateResource={resourceCreating}
+          onCreateResource={(op, _) => resourceCreating(op)}
           workspaceApplicationIdURI={props.workspaceApplicationIdURI}
           updateResource={props.updateResource}
         />

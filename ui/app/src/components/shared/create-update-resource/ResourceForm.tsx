@@ -1,5 +1,5 @@
 import { Spinner, SpinnerSize } from "@fluentui/react";
-import { useEffect, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import { LoadingState } from "../../../models/loadingState";
 import {
   HttpMethod,
@@ -20,19 +20,27 @@ import validator from "@rjsf/validator-ajv8";
 
 interface ResourceFormProps {
   templateName: string;
-  templatePath: string;
-  resourcePath: string;
+  templatePath?: string;
+  resourcePath?: string;
   updateResource?: Resource;
-  onCreateResource: (operation: Operation) => void;
+  onCreateResource: (operation: Operation | void, properties: any) => void;
   workspaceApplicationIdURI?: string;
+  formRef?: React.RefObject<{ submit: () => void; }>;
+  hideSubmitButton?: boolean;
+  overrideTemplateVersion?: string;
+  isUpgrade?: boolean;
+  schema?: any;
+  onFormChange?: (formData: any) => void;
+  onFormValidated?: (isValid: boolean) => void;
 }
 
-export const ResourceForm: React.FunctionComponent<ResourceFormProps> = (
+export const ResourceForm: React.FunctionComponent<ResourceFormProps> = forwardRef((
   props: ResourceFormProps,
+  ref,
 ) => {
-  const [template, setTemplate] = useState<any | null>(null);
-  const [formData, setFormData] = useState({});
-  const [loading, setLoading] = useState(LoadingState.Loading as LoadingState);
+  const [template, setTemplate] = useState<any | null>(props.schema || null);
+  const [formData, setFormData] = useState<any>({});
+  const [loading, setLoading] = useState(props.schema ? LoadingState.Ok : LoadingState.Loading as LoadingState);
   const [sendingData, setSendingData] = useState(false);
   const apiCall = useAuthApiCall();
   const [apiError, setApiError] = useState({} as APIError);
@@ -40,13 +48,16 @@ export const ResourceForm: React.FunctionComponent<ResourceFormProps> = (
   useEffect(() => {
     const getFullTemplate = async () => {
       try {
+        if (!props.templatePath) return;
+        let url = props.templatePath;
+        if (props.overrideTemplateVersion) {
+          url += `?version=${props.overrideTemplateVersion}`;
+        } else if (props.updateResource) {
+          url += `?is_update=true&version=${props.updateResource.templateVersion}`;
+        }
+
         // Get the full resource template containing the required parameters
-        const templateResponse = (await apiCall(
-          props.updateResource
-            ? `${props.templatePath}?is_update=true&version=${props.updateResource.templateVersion}`
-            : props.templatePath,
-          HttpMethod.Get,
-        )) as ResourceTemplate;
+        const templateResponse = (await apiCall(url, HttpMethod.Get)) as ResourceTemplate;
 
         // if it's an update, populate the form with the props that are available in the template
         if (props.updateResource) {
@@ -63,11 +74,17 @@ export const ResourceForm: React.FunctionComponent<ResourceFormProps> = (
       }
     };
 
-    // Fetch full resource template only if not in state
-    if (!template) {
+    // Fetch full resource template only if not in state, or if a schema hasn't been passed in
+    if (!template && !props.schema) {
       getFullTemplate();
     }
-  }, [apiCall, props.templatePath, template, props.updateResource]);
+  }, [apiCall, props.templatePath, template, props.updateResource, props.overrideTemplateVersion, props.schema]);
+
+  useImperativeHandle(ref, () => ({
+    submit: () => {
+      createUpdateResource(formData);
+    }
+  }));
 
   const removeReadOnlyProps = (data: any, template: ResourceTemplate): any => {
     // flatten all the nested properties from across the template into a basic array we can iterate easily
@@ -107,6 +124,11 @@ export const ResourceForm: React.FunctionComponent<ResourceFormProps> = (
     let response;
     try {
       if (props.updateResource) {
+        const payload: any = { properties: data };
+        if (props.isUpgrade) {
+          payload.templateVersion = props.overrideTemplateVersion;
+        }
+
         const wsAuth =
           props.updateResource.resourceType === ResourceType.WorkspaceService ||
           props.updateResource.resourceType === ResourceType.UserResource;
@@ -114,7 +136,7 @@ export const ResourceForm: React.FunctionComponent<ResourceFormProps> = (
           props.updateResource.resourcePath,
           HttpMethod.Patch,
           wsAuth ? props.workspaceApplicationIdURI : undefined,
-          { properties: data },
+          payload,
           ResultType.JSON,
           undefined,
           undefined,
@@ -122,6 +144,10 @@ export const ResourceForm: React.FunctionComponent<ResourceFormProps> = (
         );
       } else {
         const resource = { templateName: props.templateName, properties: data };
+        if (!props.resourcePath) {
+          props.onCreateResource(undefined, data);
+          return;
+        }
         response = await apiCall(
           props.resourcePath,
           HttpMethod.Post,
@@ -132,7 +158,7 @@ export const ResourceForm: React.FunctionComponent<ResourceFormProps> = (
       }
 
       setSendingData(false);
-      props.onCreateResource(response.operation);
+      props.onCreateResource(response.operation, data);
     } catch (err: any) {
       err.userMessage = "Error sending create / update request";
       setApiError(err);
@@ -146,6 +172,10 @@ export const ResourceForm: React.FunctionComponent<ResourceFormProps> = (
   uiSchema.overview = {
     "ui:widget": "textarea",
   };
+
+  if (props.hideSubmitButton) {
+    uiSchema["ui:submitButtonOptions"] = { norender: true };
+  }
 
   // if no specific order has been set, set a generic one with the primary fields at the top
   if (!uiSchema["ui:order"] || uiSchema["ui:order"].length === 0) {
@@ -166,19 +196,29 @@ export const ResourceForm: React.FunctionComponent<ResourceFormProps> = (
               />
             ) : (
               <Form
+                liveOmit={true}
                 omitExtraData={true}
                 schema={template}
                 formData={formData}
                 uiSchema={uiSchema}
                 validator={validator}
                 onSubmit={(e: any) => createUpdateResource(e.formData)}
+                onChange={(e: any) => {
+                  setFormData(e.formData)
+                  if (props.onFormChange) {
+                    props.onFormChange(e.formData);
+                  }
+                }}
+                onErrors={(errors: any) => {
+                  if (props.onFormValidated) {
+                    props.onFormValidated(errors.length === 0);
+                  }
+                }}
               />
             )}
           </div>
         )
       );
-    case LoadingState.Error:
-      return <ExceptionLayout e={apiError} />;
     case LoadingState.Error:
       return <ExceptionLayout e={apiError} />;
     default:
@@ -193,4 +233,4 @@ export const ResourceForm: React.FunctionComponent<ResourceFormProps> = (
         </div>
       );
   }
-};
+});

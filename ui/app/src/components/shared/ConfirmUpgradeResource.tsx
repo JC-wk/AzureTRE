@@ -10,7 +10,7 @@ import {
   Icon,
   Stack,
 } from "@fluentui/react";
-import React, { useContext, useState, useEffect } from "react";
+import React, { useContext, useState, useEffect, useRef } from "react";
 import { AvailableUpgrade, Resource } from "../../models/resource";
 import {
   HttpMethod,
@@ -24,8 +24,8 @@ import { LoadingState } from "../../models/loadingState";
 import { ExceptionLayout } from "./ExceptionLayout";
 import { useAppDispatch } from "../../hooks/customReduxHooks";
 import { addUpdateOperation } from "../shared/notifications/operationsSlice";
-import Form from "@rjsf/fluent-ui";
-import validator from "@rjsf/validator-ajv8";
+import { ResourceForm } from "./create-update-resource/ResourceForm";
+import { ApiEndpoint } from "../../models/apiEndpoints";
 
 interface ConfirmUpgradeProps {
   resource: Resource;
@@ -116,11 +116,12 @@ export const ConfirmUpgradeResource: React.FunctionComponent<
   );
   const workspaceCtx = useContext(WorkspaceContext);
   const dispatch = useAppDispatch();
+  const formRef = useRef<any>();
 
   const [newPropertiesToFill, setNewPropertiesToFill] = useState<string[]>([]);
-  const [newPropertyValues, setNewPropertyValues] = useState<any>({});
   const [loadingSchema, setLoadingSchema] = useState(false);
   const [newTemplateSchema, setNewTemplateSchema] = useState<any | null>(null);
+  const [isFormValid, setIsFormValid] = useState(false);
 
   const upgradeProps = {
     type: DialogType.normal,
@@ -155,11 +156,18 @@ export const ConfirmUpgradeResource: React.FunctionComponent<
       setApiError(null);
       try {
         let fetchUrl = "";
-        if (props.resource.resourceType === ResourceType.Workspace) {
-          fetchUrl = `/workspace-templates/${props.resource.templateName}?version=${selectedVersion}`;
-        } else {
-          const templateType = props.resource.resourceType.toLowerCase();
-          fetchUrl = `/templates/${templateType}/${selectedVersion}`;
+        switch (props.resource.resourceType) {
+          case ResourceType.Workspace:
+            fetchUrl = `${ApiEndpoint.WorkspaceTemplates}/${props.resource.templateName}?version=${selectedVersion}`;
+            break;
+          case ResourceType.WorkspaceService:
+            fetchUrl = `${ApiEndpoint.WorkspaceServiceTemplates}/${props.resource.templateName}?version=${selectedVersion}`;
+            break;
+          case ResourceType.SharedService:
+            fetchUrl = `${ApiEndpoint.SharedServiceTemplates}/${props.resource.templateName}?version=${selectedVersion}`;
+            break;
+          default:
+            throw Error("Unsupported resource type.");
         }
 
         const res = await apiCall(
@@ -204,49 +212,12 @@ export const ConfirmUpgradeResource: React.FunctionComponent<
     };
 
     fetchNewTemplateSchema();
-  }, [selectedVersion]);
+  }, [selectedVersion, apiCall, props.resource]);
 
-  const upgradeCall = async () => {
-    setRequestLoadingState(LoadingState.Loading);
-    try {
-      let body: any = { templateVersion: selectedVersion };
-
-      // Patch only the new properties inside the 'properties' field
-      if (!body.properties) {
-        body.properties = {};
-      }
-      console.log("New property values to set:", newPropertyValues);
-      Object.keys(newPropertyValues).forEach((key) => {
-        const val = newPropertyValues[key];
-        body.properties[key] = val;
-      });
-      console.log("Final upgrade body:", body);
-
-      // Include other optional properties if applicable
-      // Object.keys(newPropertyValues).forEach((key) => {
-      //   if (newPropertiesToFill.includes(key)) {
-      //     body.properties[key] = newPropertyValues[key];
-      //   }
-      // });
-
-      let op = await apiCall(
-        props.resource.resourcePath,
-        HttpMethod.Patch,
-        wsAuth ? workspaceCtx.workspaceApplicationIdURI : undefined,
-        body,
-        ResultType.JSON,
-        undefined,
-        undefined,
-        props.resource._etag,
-      );
-      dispatch(addUpdateOperation(op.operation));
+  const upgradeCall = async (op: any) => {
+    if (op) {
+      dispatch(addUpdateOperation(op));
       props.onDismiss();
-    } catch (err: any) {
-      if (!err.userMessage) {
-        err.userMessage = "Failed to upgrade resource";
-      }
-      setApiError(err);
-      setRequestLoadingState(LoadingState.Error);
     }
   };
 
@@ -330,14 +301,16 @@ export const ConfirmUpgradeResource: React.FunctionComponent<
                 </MessageBar>
 
                 {finalSchema && (
-                  <Form
-                    liveOmit={true}
-                    omitExtraData={true}
+                  <ResourceForm
+                    templateName={props.resource.templateName}
                     schema={finalSchema}
-                    formData={newPropertyValues}
-                    uiSchema={uiSchema}
-                    validator={validator}
-                    onChange={(e) => setNewPropertyValues(e.formData)}
+                    updateResource={props.resource}
+                    onCreateResource={(op, _) => upgradeCall(op)}
+                    formRef={formRef}
+                    hideSubmitButton={true}
+                    isUpgrade={true}
+                    overrideTemplateVersion={selectedVersion}
+                    onFormValidated={setIsFormValid}
                   />
                 )}
               </Stack>
@@ -355,15 +328,9 @@ export const ConfirmUpgradeResource: React.FunctionComponent<
                 selectedKey={selectedVersion}
               />
               <PrimaryButton
-                primaryDisabled={
-                  !selectedVersion ||
-                  (newPropertiesToFill.length > 0 &&
-                    Object.values(newPropertyValues).some(
-                      (v) => v === "" || v === undefined,
-                    ))
-                }
+                primaryDisabled={!selectedVersion || (newPropertiesToFill.length > 0 && !isFormValid)}
                 text="Upgrade"
-                onClick={() => upgradeCall()}
+                onClick={() => formRef.current.submit()}
               />
             </DialogFooter>
           </>
