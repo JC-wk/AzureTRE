@@ -20,24 +20,27 @@ import validator from "@rjsf/validator-ajv8";
 
 interface ResourceFormProps {
   templateName: string;
-  templatePath: string;
-  resourcePath: string;
+  templatePath?: string;
+  resourcePath?: string;
   updateResource?: Resource;
-  onCreateResource: (operation: Operation | void) => void;
+  onCreateResource: (operation: Operation | void, properties: any) => void;
   workspaceApplicationIdURI?: string;
-  formRef?: React.RefObject<any>;
+  formRef?: React.RefObject<{ submit: () => void; }>;
   hideSubmitButton?: boolean;
   overrideTemplateVersion?: string;
   isUpgrade?: boolean;
+  schema?: any;
+  onFormChange?: (formData: any) => void;
+  onFormValidated?: (isValid: boolean) => void;
 }
 
 export const ResourceForm: React.FunctionComponent<ResourceFormProps> = forwardRef((
   props: ResourceFormProps,
   ref,
 ) => {
-  const [template, setTemplate] = useState<any | null>(null);
+  const [template, setTemplate] = useState<any | null>(props.schema || null);
   const [formData, setFormData] = useState<any>({});
-  const [loading, setLoading] = useState(LoadingState.Loading as LoadingState);
+  const [loading, setLoading] = useState(props.schema ? LoadingState.Ok : LoadingState.Loading as LoadingState);
   const [sendingData, setSendingData] = useState(false);
   const apiCall = useAuthApiCall();
   const [apiError, setApiError] = useState({} as APIError);
@@ -45,6 +48,7 @@ export const ResourceForm: React.FunctionComponent<ResourceFormProps> = forwardR
   useEffect(() => {
     const getFullTemplate = async () => {
       try {
+        if (!props.templatePath) return;
         let url = props.templatePath;
         if (props.overrideTemplateVersion) {
           url += `?version=${props.overrideTemplateVersion}`;
@@ -70,11 +74,11 @@ export const ResourceForm: React.FunctionComponent<ResourceFormProps> = forwardR
       }
     };
 
-    // Fetch full resource template only if not in state
-    if (!template) {
+    // Fetch full resource template only if not in state, or if a schema hasn't been passed in
+    if (!template && !props.schema) {
       getFullTemplate();
     }
-  }, [apiCall, props.templatePath, template, props.updateResource, props.overrideTemplateVersion]);
+  }, [apiCall, props.templatePath, template, props.updateResource, props.overrideTemplateVersion, props.schema]);
 
   useImperativeHandle(ref, () => ({
     submit: () => {
@@ -140,6 +144,10 @@ export const ResourceForm: React.FunctionComponent<ResourceFormProps> = forwardR
         );
       } else {
         const resource = { templateName: props.templateName, properties: data };
+        if (!props.resourcePath) {
+          props.onCreateResource(undefined, data);
+          return;
+        }
         response = await apiCall(
           props.resourcePath,
           HttpMethod.Post,
@@ -150,7 +158,7 @@ export const ResourceForm: React.FunctionComponent<ResourceFormProps> = forwardR
       }
 
       setSendingData(false);
-      props.onCreateResource(response.operation);
+      props.onCreateResource(response.operation, data);
     } catch (err: any) {
       err.userMessage = "Error sending create / update request";
       setApiError(err);
@@ -195,7 +203,17 @@ export const ResourceForm: React.FunctionComponent<ResourceFormProps> = forwardR
                 uiSchema={uiSchema}
                 validator={validator}
                 onSubmit={(e: any) => createUpdateResource(e.formData)}
-                onChange={(e: any) => setFormData(e.formData)}
+                onChange={(e: any) => {
+                  setFormData(e.formData)
+                  if (props.onFormChange) {
+                    props.onFormChange(e.formData);
+                  }
+                }}
+                onErrors={(errors: any) => {
+                  if (props.onFormValidated) {
+                    props.onFormValidated(errors.length === 0);
+                  }
+                }}
               />
             )}
           </div>
