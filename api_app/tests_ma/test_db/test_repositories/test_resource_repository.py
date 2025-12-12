@@ -459,3 +459,39 @@ async def test_patch_resource_removes_properties_on_version_upgrade(_, __, ___, 
     assert 'prop_to_remove' not in resource.properties
     assert 'prop_in_allof_to_remove' not in resource.properties
     assert 'os_image' not in resource.properties
+
+
+@pytest.mark.asyncio
+@patch("db.repositories.resources_history.ResourceHistoryRepository.save_item", return_value=AsyncMock())
+@patch('db.repositories.resources.ResourceRepository.update_item_with_etag', return_value=AsyncMock())
+@patch('db.repositories.resources.ResourceRepository.validate_patch')
+@patch('db.repositories.resources.ResourceRepository.validate_template_version_patch')
+@patch('db.repositories.resources.ResourceRepository.get_timestamp', return_value=FAKE_UPDATE_TIMESTAMP)
+async def test_patch_resource_deletes_unsubmitted_stale_properties(_, __, ___, ____, _____, resource_repo, resource_history_repo):
+    resource = sample_resource()
+    resource.properties['prop_to_update'] = 'old_value'
+    resource.properties['prop_to_keep'] = 'original_value'
+    resource.properties['prop_to_delete'] = 'value_to_be_deleted'
+
+    old_template = sample_resource_template()
+    old_template['properties']['prop_to_update'] = {'type': 'string', 'updateable': True}
+    old_template['properties']['prop_to_keep'] = {'type': 'string'}
+    old_template['properties']['prop_to_delete'] = {'type': 'string'}
+
+    new_template = sample_resource_template()
+    new_template['properties']['prop_to_update'] = {'type': 'string', 'updateable': True}
+    new_template['properties']['prop_to_keep'] = {'type': 'string'}
+    new_template['version'] = '0.2.0'
+
+    resource_patch = ResourcePatch(templateVersion='0.2.0', properties={'prop_to_update': 'new_value'})
+    etag = "some-etag-value"
+    user = create_test_user()
+
+    template_repo_mock = MagicMock()
+    template_repo_mock.get_template_by_name_and_version = AsyncMock(return_value=ResourceTemplate(**new_template))
+
+    await resource_repo.patch_resource(resource, resource_patch, ResourceTemplate(**old_template), etag, template_repo_mock, resource_history_repo, user, strings.RESOURCE_ACTION_UPDATE)
+
+    assert 'prop_to_delete' not in resource.properties
+    assert resource.properties['prop_to_update'] == 'new_value'
+    assert resource.properties['prop_to_keep'] == 'original_value'
