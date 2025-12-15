@@ -154,6 +154,27 @@ def sample_resource_operation_in_response(resource_id: str, operation_id: str):
     return OperationInResponse(operation=op)
 
 
+def sample_resource_template() -> ResourceTemplate:
+    return ResourceTemplate(id="123",
+                            name="tre-workspace-base",
+                            description="description",
+                            version="0.1.0",
+                            resourceType=ResourceType.Workspace,
+                            current=True,
+                            required=['display_name', 'description'],
+                            properties={
+                                'display_name': {
+                                    'type': 'string',
+                                    'title': 'Title of the resource'
+                                },
+                                'description': {
+                                    'type': 'string',
+                                    'title': 'Description of the resource'
+                                },
+                            },
+                            actions=[])
+
+
 def sample_deployed_workspace(workspace_id=WORKSPACE_ID, authInfo={}):
     workspace = Workspace(
         id=workspace_id,
@@ -564,7 +585,7 @@ class TestWorkspaceRoutesThatRequireAdminRights:
     @patch("api.routes.workspaces.send_resource_request_message", return_value=sample_resource_operation(resource_id=WORKSPACE_ID, operation_id=OPERATION_ID))
     @patch("api.dependencies.workspaces.WorkspaceRepository.get_workspace_by_id", return_value=sample_workspace())
     @patch("api.routes.workspaces.WorkspaceRepository.update_item_with_etag", return_value=sample_workspace())
-    @patch("api.routes.workspaces.ResourceTemplateRepository.get_template_by_name_and_version", return_value=sample_workspace())
+    @patch("api.routes.workspaces.ResourceTemplateRepository.get_template_by_name_and_version", return_value=sample_resource_template())
     @patch("api.routes.workspaces.WorkspaceRepository.get_timestamp", return_value=FAKE_UPDATE_TIMESTAMP)
     async def test_patch_workspaces_with_upgrade_major_version_and_force_update_returns_patched_workspace(self, _, __, update_item_mock, ___, ____, _____, ______, app, client):
         workspace_patch = {"templateVersion": "2.0.0"}
@@ -611,7 +632,7 @@ class TestWorkspaceRoutesThatRequireAdminRights:
     @patch("api.routes.workspaces.send_resource_request_message", return_value=sample_resource_operation(resource_id=WORKSPACE_ID, operation_id=OPERATION_ID))
     @patch("api.dependencies.workspaces.WorkspaceRepository.get_workspace_by_id", return_value=sample_workspace())
     @patch("api.routes.workspaces.WorkspaceRepository.update_item_with_etag", return_value=sample_workspace())
-    @patch("api.routes.workspaces.ResourceTemplateRepository.get_template_by_name_and_version", return_value=sample_workspace())
+    @patch("api.routes.workspaces.ResourceTemplateRepository.get_template_by_name_and_version", return_value=sample_resource_template())
     @patch("api.routes.workspaces.WorkspaceRepository.get_timestamp", return_value=FAKE_UPDATE_TIMESTAMP)
     async def test_patch_workspaces_with_upgrade_minor_version_patches_workspace(self, _, __, update_item_mock, ___, ____, _____, ______, app, client):
         workspace_patch = {"templateVersion": "0.2.0"}

@@ -371,7 +371,7 @@ async def test_patch_resource_preserves_property_history(_, __, ___, resource_re
 
 
 @patch('db.repositories.resources.ResourceTemplateRepository.enrich_template')
-def test_validate_patch_with_good_fields_passes(template_repo, resource_repo):
+async def test_validate_patch_with_good_fields_passes(template_repo, resource_repo):
     """
     Make sure that patch is NOT valid when non-updateable fields are included
     """
@@ -381,11 +381,11 @@ def test_validate_patch_with_good_fields_passes(template_repo, resource_repo):
 
     # check it's valid when updating a single updateable prop
     patch = ResourcePatch(isEnabled=True, properties={'vm_size': 'large'})
-    resource_repo.validate_patch(patch, template_repo, template, strings.RESOURCE_ACTION_UPDATE)
+    await resource_repo.validate_patch(patch, template_repo, template, strings.RESOURCE_ACTION_UPDATE)
 
 
 @patch('db.repositories.resources.ResourceTemplateRepository.enrich_template')
-def test_validate_patch_with_bad_fields_fails(template_repo, resource_repo):
+async def test_validate_patch_with_bad_fields_fails(template_repo, resource_repo):
     """
     Make sure that patch is NOT valid when non-updateable fields are included
     """
@@ -396,14 +396,14 @@ def test_validate_patch_with_bad_fields_fails(template_repo, resource_repo):
     # check it's invalid when sending an unexpected field
     patch = ResourcePatch(isEnabled=True, properties={'vm_size': 'large', 'unexpected_field': 'surprise!'})
     with pytest.raises(ValidationError):
-        resource_repo.validate_patch(patch, template_repo, template, strings.RESOURCE_ACTION_INSTALL)
+        await resource_repo.validate_patch(patch, template_repo, template, strings.RESOURCE_ACTION_INSTALL)
 
     # check it's invalid when sending a bad value
     patch = ResourcePatch(isEnabled=True, properties={'vm_size': 'huge'})
     with pytest.raises(ValidationError):
-        resource_repo.validate_patch(patch, template_repo, template, strings.RESOURCE_ACTION_INSTALL)
+        await resource_repo.validate_patch(patch, template_repo, template, strings.RESOURCE_ACTION_INSTALL)
 
     # check it's invalid when trying to update a non-updateable field
     patch = ResourcePatch(isEnabled=True, properties={'vm_size': 'large', 'os_image': 'linux'})
     with pytest.raises(ValidationError):
-        resource_repo.validate_patch(patch, template_repo, template, strings.RESOURCE_ACTION_INSTALL)
+        await resource_repo.validate_patch(patch, template_repo, template, strings.RESOURCE_ACTION_INSTALL)
