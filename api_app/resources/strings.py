@@ -7,6 +7,7 @@ API_GET_METADATA = "Get public API metadata (e.g. to support the UI and CLI)"
 API_MIGRATE_DATABASE = "Migrate documents in the database"
 
 API_GET_MY_OPERATIONS = "Get Operations that the current user has initiated"
+API_DELETE_OPERATION = "Delete an operation"
 API_GET_ALL_WORKSPACES = "Get all workspaces"
 API_GET_WORKSPACE_BY_ID = "Get workspace by Id"
 API_GET_WORKSPACE_SCOPE_ID_BY_WORKSPACE_ID = "Get workspace Scope Id by workspace Id"
