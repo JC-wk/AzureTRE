@@ -1,9 +1,29 @@
+import fs from 'fs';
+import path from 'path';
+
+// Create config.json from config.source.json if it doesn't exist
+const configPath = path.resolve(__dirname, 'config.json');
+const sourcePath = path.resolve(__dirname, 'config.source.json');
+
+try {
+  if (!fs.existsSync(configPath)) {
+    const sourceContent = fs.readFileSync(sourcePath, 'utf8');
+    fs.writeFileSync(configPath, sourceContent, 'utf8');
+  }
+} catch (error) {
+  console.error('Failed to create config.json for test environment:', error);
+  process.exit(1);
+}
+
 import "@testing-library/jest-dom";
 import { expect, beforeAll, vi } from "vitest";
 import React from "react";
 
 // Setup global mocks
 beforeAll(() => {
+  // Mock console to suppress MSAL warnings in tests
+  vi.spyOn(console, 'warn').mockImplementation(() => {});
+  vi.spyOn(console, 'error').mockImplementation(() => {});
   // Mock ResizeObserver which is not available in jsdom
   global.ResizeObserver = vi.fn().mockImplementation(() => ({
     observe: vi.fn(),

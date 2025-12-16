@@ -113,8 +113,7 @@ export const ConfirmDisableEnableResource: React.FunctionComponent<
         {loading === LoadingState.Loading && (
           <Spinner
             label="Sending request..."
-            ariaLive="assertive"
-            labelPosition="right"
+            aria-live="assertive"
           />
         )}
         {loading === LoadingState.Error && <ExceptionLayout e={apiError} />}
