@@ -111,14 +111,6 @@ const mockWorkspaceContext = {
   setWorkspace: vi.fn(),
 };
 
-const renderWithWorkspaceContext = (component: React.ReactElement) => {
-  return render(
-    <WorkspaceContext.Provider value={mockWorkspaceContext}>
-      {component}
-    </WorkspaceContext.Provider>
-  );
-};
-
 describe("ConfirmDisableEnableResource Component", () => {
   const mockOnDismiss = vi.fn();
 
@@ -126,14 +118,21 @@ describe("ConfirmDisableEnableResource Component", () => {
     vi.clearAllMocks();
   });
 
-  it("renders disable dialog for enabled resource", () => {
-    renderWithWorkspaceContext(
+  const renderComponent = (isEnabled: boolean) => {
+    return render(
       <ConfirmDisableEnableResource
         resource={mockResource}
-        isEnabled={false}
+        isEnabled={isEnabled}
         onDismiss={mockOnDismiss}
-      />
+      />,
+      {
+        workspaceContext: mockWorkspaceContext,
+      }
     );
+  };
+
+  it("renders disable dialog for enabled resource", () => {
+    renderComponent(false);
 
     expect(screen.getByTestId("dialog-title")).toHaveTextContent(
       "Disable Resource?"
@@ -145,13 +144,7 @@ describe("ConfirmDisableEnableResource Component", () => {
   });
 
   it("renders enable dialog for disabled resource", () => {
-    renderWithWorkspaceContext(
-      <ConfirmDisableEnableResource
-        resource={mockResource}
-        isEnabled={true}
-        onDismiss={mockOnDismiss}
-      />
-    );
+    renderComponent(true);
 
     expect(screen.getByTestId("dialog-title")).toHaveTextContent(
       "Enable Resource?"
@@ -163,13 +156,7 @@ describe("ConfirmDisableEnableResource Component", () => {
   });
 
   it("calls onDismiss when cancel button is clicked", () => {
-    renderWithWorkspaceContext(
-      <ConfirmDisableEnableResource
-        resource={mockResource}
-        isEnabled={false}
-        onDismiss={mockOnDismiss}
-      />
-    );
+    renderComponent(false);
 
     fireEvent.click(screen.getByTestId("default-button"));
     expect(mockOnDismiss).toHaveBeenCalledTimes(1);
@@ -179,13 +166,7 @@ describe("ConfirmDisableEnableResource Component", () => {
     const mockOperation = { id: "operation-id", status: "running" };
     mockApiCall.mockResolvedValue({ operation: mockOperation });
 
-    renderWithWorkspaceContext(
-      <ConfirmDisableEnableResource
-        resource={mockResource}
-        isEnabled={false}
-        onDismiss={mockOnDismiss}
-      />
-    );
+    renderComponent(false);
 
     fireEvent.click(screen.getByTestId("primary-button"));
 
@@ -211,13 +192,7 @@ describe("ConfirmDisableEnableResource Component", () => {
       () => new Promise((resolve) => setTimeout(resolve, 100))
     );
 
-    renderWithWorkspaceContext(
-      <ConfirmDisableEnableResource
-        resource={mockResource}
-        isEnabled={false}
-        onDismiss={mockOnDismiss}
-      />
-    );
+    renderComponent(false);
 
     fireEvent.click(screen.getByTestId("primary-button"));
 
@@ -229,13 +204,7 @@ describe("ConfirmDisableEnableResource Component", () => {
     const error = new Error("Network error");
     mockApiCall.mockRejectedValue(error);
 
-    renderWithWorkspaceContext(
-      <ConfirmDisableEnableResource
-        resource={mockResource}
-        isEnabled={false}
-        onDismiss={mockOnDismiss}
-      />
-    );
+    renderComponent(false);
 
     fireEvent.click(screen.getByTestId("primary-button"));
 
@@ -249,13 +218,7 @@ describe("ConfirmDisableEnableResource Component", () => {
     const mockOperation = { id: "operation-id", status: "running" };
     mockApiCall.mockResolvedValue({ operation: mockOperation });
 
-    renderWithWorkspaceContext(
-      <ConfirmDisableEnableResource
-        resource={mockResource}
-        isEnabled={false}
-        onDismiss={mockOnDismiss}
-      />
-    );
+    renderComponent(false);
 
     fireEvent.click(screen.getByTestId("primary-button"));
 
@@ -281,12 +244,15 @@ describe("ConfirmDisableEnableResource Component", () => {
     const mockOperation = { id: "operation-id", status: "running" };
     mockApiCall.mockResolvedValue({ operation: mockOperation });
 
-    renderWithWorkspaceContext(
+    render(
       <ConfirmDisableEnableResource
         resource={sharedServiceResource}
         isEnabled={false}
         onDismiss={mockOnDismiss}
-      />
+      />,
+      {
+        workspaceContext: mockWorkspaceContext,
+      }
     );
 
     fireEvent.click(screen.getByTestId("primary-button"));

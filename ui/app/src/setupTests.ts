@@ -21,6 +21,9 @@ import React from "react";
 
 // Setup global mocks
 beforeAll(() => {
+  // Mock console to suppress MSAL warnings in tests
+  vi.spyOn(console, 'warn').mockImplementation(() => {});
+  vi.spyOn(console, 'error').mockImplementation(() => {});
   // Mock ResizeObserver which is not available in jsdom
   global.ResizeObserver = vi.fn().mockImplementation(() => ({
     observe: vi.fn(),
