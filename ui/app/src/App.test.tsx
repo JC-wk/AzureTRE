@@ -46,20 +46,6 @@ vi.mock("@azure/msal-browser", async () => {
   };
 });
 
-// Mock MSAL React components
-vi.mock("@azure/msal-react", () => ({
-  MsalProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  MsalAuthenticationTemplate: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  useMsal: vi.fn(() => ({
-    instance: {
-      getAllAccounts: vi.fn().mockReturnValue([]),
-      getActiveAccount: vi.fn().mockReturnValue(null),
-    },
-    accounts: [],
-  })),
-  useAccount: vi.fn(() => null),
-}));
-
 // Mock the API hook
 vi.mock("./hooks/useAuthApiCall", () => ({
   useAuthApiCall: () => vi.fn().mockResolvedValue([]),

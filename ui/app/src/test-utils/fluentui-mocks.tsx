@@ -108,7 +108,11 @@ export const createFluentUIMocks = () => ({
       <div data-testid="dialog" role="dialog" {...props}>
         <div data-testid="dialog-title">{dialogContentProps?.title}</div>
         <div data-testid="dialog-subtext">{dialogContentProps?.subText}</div>
-        <button data-testid="dialog-close" onClick={onDismiss}>
+        <button
+          data-testid="dialog-close"
+          onClick={onDismiss}
+          aria-label={dialogContentProps?.closeButtonAriaLabel || 'Close'}
+        >
           X
         </button>
         {children}
@@ -210,6 +214,7 @@ export const createFluentUIMocks = () => ({
     label,
     disabled,
     styles,
+    onRenderOption,
     ...props
   }: any) => (
     <div>
@@ -277,10 +282,10 @@ export const createFluentUIMocks = () => ({
   ),
 
   Icon: ({ iconName, styles, ...props }: any) => (
-    <span 
-      data-testid={`icon${iconName ? `-${iconName}` : ''}`} 
-      data-icon-name={iconName} 
-      style={styles?.root} 
+    <span
+      data-testid={`icon${iconName ? `-${iconName}` : ''}`}
+      data-icon-name={iconName}
+      style={styles?.root}
       {...props}
     >
       {iconName}
@@ -317,12 +322,14 @@ export const createFluentUIMocks = () => ({
     </div>
   ),
 
-  Spinner: ({ label, size, styles, ...props }: any) => (
+  Spinner: ({ label, size, styles, ariaLive, labelPosition, ...props }: any) => (
     <div
       data-testid="spinner"
       role="progressbar"
       data-size={size}
       style={styles?.root}
+      {...(ariaLive ? { 'aria-live': ariaLive } : {})}
+      {...(labelPosition ? { 'data-label-position': labelPosition } : {})}
       {...props}
     >
       {label}
@@ -372,8 +379,14 @@ export const createFluentUIMocks = () => ({
   ),
 
   // Overlay components
-  TooltipHost: ({ content, children, styles, ...props }: any) => (
-    <div data-testid="tooltip" title={content} style={styles?.root} {...props}>
+  TooltipHost: ({ content, children, styles, tooltipProps, ...props }: any) => (
+    <div
+      data-testid="tooltip"
+      title={content}
+      style={styles?.root}
+      {...(tooltipProps ? { 'data-tooltip-props': JSON.stringify(tooltipProps) } : {})}
+      {...props}
+    >
       {children}
     </div>
   ),
@@ -482,13 +495,24 @@ export const createFluentUIMocks = () => ({
     headerText,
     children,
     styles,
+    closeButtonAriaLabel,
+    isLightDismiss,
     ...props
   }: any) =>
     isOpen ? (
-      <div data-testid="panel" style={styles?.root} {...props}>
+      <div
+        data-testid="panel"
+        style={styles?.root}
+        {...(isLightDismiss ? { 'data-is-light-dismiss': true } : {})}
+        {...props}
+      >
         <div data-testid="panel-header">
           {headerText}
-          <button data-testid="panel-close" onClick={onDismiss}>
+          <button
+            data-testid="panel-close"
+            onClick={onDismiss}
+            aria-label={closeButtonAriaLabel || 'Close'}
+          >
             X
           </button>
         </div>
