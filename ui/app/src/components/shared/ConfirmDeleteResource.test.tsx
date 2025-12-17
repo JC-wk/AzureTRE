@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor, createPartialFluentUIMock } from "../../test-utils";
+import { render, screen, fireEvent, waitFor, createPartialFluentUIMock, act } from "../../test-utils";
 import { ConfirmDeleteResource } from "./ConfirmDeleteResource";
 import { Resource } from "../../models/resource";
 import { ResourceType } from "../../models/resourceType";
@@ -151,21 +151,25 @@ describe("ConfirmDeleteResource Component", () => {
     expect(screen.getByTestId("default-button")).toHaveTextContent("Cancel");
   });
 
-  it("calls onDismiss when cancel button is clicked", () => {
+  it("calls onDismiss when cancel button is clicked", async () => {
     renderWithContext(
       <ConfirmDeleteResource resource={mockResource} onDismiss={mockOnDismiss} />
     );
 
-    fireEvent.click(screen.getByTestId("default-button"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("default-button"));
+    });
     expect(mockOnDismiss).toHaveBeenCalledTimes(1);
   });
 
-  it("calls onDismiss when close button is clicked", () => {
+  it("calls onDismiss when close button is clicked", async () => {
     renderWithContext(
       <ConfirmDeleteResource resource={mockResource} onDismiss={mockOnDismiss} />
     );
 
-    fireEvent.click(screen.getByTestId("dialog-close"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("dialog-close"));
+    });
     expect(mockOnDismiss).toHaveBeenCalledTimes(1);
   });
 
@@ -177,7 +181,9 @@ describe("ConfirmDeleteResource Component", () => {
       <ConfirmDeleteResource resource={mockResource} onDismiss={mockOnDismiss} />
     );
 
-    fireEvent.click(screen.getByTestId("primary-button"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("primary-button"));
+    });
 
     await waitFor(() => {
       expect(screen.getByTestId("spinner")).toBeInTheDocument();
@@ -195,7 +201,9 @@ describe("ConfirmDeleteResource Component", () => {
       <ConfirmDeleteResource resource={mockResource} onDismiss={mockOnDismiss} />
     );
 
-    fireEvent.click(screen.getByTestId("primary-button"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("primary-button"));
+    });
 
     await waitFor(() => {
       expect(mockApiCall).toHaveBeenCalledWith(
@@ -227,7 +235,9 @@ describe("ConfirmDeleteResource Component", () => {
       />
     );
 
-    fireEvent.click(screen.getByTestId("primary-button"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("primary-button"));
+    });
 
     await waitFor(() => {
       expect(mockApiCall).toHaveBeenCalledWith(
@@ -253,7 +263,9 @@ describe("ConfirmDeleteResource Component", () => {
       <ConfirmDeleteResource resource={userResource} onDismiss={mockOnDismiss} />
     );
 
-    fireEvent.click(screen.getByTestId("primary-button"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("primary-button"));
+    });
 
     await waitFor(() => {
       expect(mockApiCall).toHaveBeenCalledWith(
@@ -274,7 +286,9 @@ describe("ConfirmDeleteResource Component", () => {
       <ConfirmDeleteResource resource={mockResource} onDismiss={mockOnDismiss} />
     );
 
-    fireEvent.click(screen.getByTestId("primary-button"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("primary-button"));
+    });
 
     await waitFor(() => {
       expect(screen.getByTestId("exception-layout")).toBeInTheDocument();
@@ -292,7 +306,9 @@ describe("ConfirmDeleteResource Component", () => {
       <ConfirmDeleteResource resource={mockResource} onDismiss={mockOnDismiss} />
     );
 
-    fireEvent.click(screen.getByTestId("primary-button"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("primary-button"));
+    });
 
     await waitFor(() => {
       expect(screen.getByTestId("exception-layout")).toBeInTheDocument();

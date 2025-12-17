@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent, createPartialFluentUIMock } from "../../test-utils";
+import { render, screen, fireEvent, createPartialFluentUIMock, act } from "../../test-utils";
 import { ExceptionLayout } from "./ExceptionLayout";
 import { APIError } from "../../models/exceptions";
 
@@ -19,14 +19,16 @@ describe("ExceptionLayout Component", () => {
     return { ...error, ...overrides };
   };
 
-  it("renders access denied message for 403 status", () => {
+  it("renders access denied message for 403 status", async () => {
     const error = createMockError({
       status: 403,
       userMessage: "You don't have permission",
       message: "Forbidden access"
     });
 
-    render(<ExceptionLayout e={error} />);
+    await act(async () => {
+      render(<ExceptionLayout e={error} />);
+    });
 
     expect(screen.getByTestId("message-bar")).toBeInTheDocument();
     expect(screen.getByText("Access Denied")).toBeInTheDocument();
@@ -35,22 +37,27 @@ describe("ExceptionLayout Component", () => {
     expect(screen.getByText("Attempted resource: /test/endpoint")).toBeInTheDocument();
   });
 
-  it("renders nothing for 429 status (rate limiting)", () => {
+  it("renders nothing for 429 status (rate limiting)", async () => {
     const error = createMockError({ status: 429 });
 
-    const { container } = render(<ExceptionLayout e={error} />);
+    let container: any;
+    await act(async () => {
+      container = render(<ExceptionLayout e={error} />).container;
+    });
 
     expect(container.firstChild).toBeNull();
   });
 
-  it("renders default error message for other status codes", () => {
+  it("renders default error message for other status codes", async () => {
     const error = createMockError({
       status: 500,
       userMessage: "Internal server error",
       message: "Something went wrong"
     });
 
-    render(<ExceptionLayout e={error} />);
+    await act(async () => {
+      render(<ExceptionLayout e={error} />);
+    });
 
     expect(screen.getByTestId("message-bar")).toBeInTheDocument();
     expect(screen.getByText("Internal server error")).toBeInTheDocument();
@@ -58,17 +65,21 @@ describe("ExceptionLayout Component", () => {
     expect(screen.getByTestId("dismiss-button")).toBeInTheDocument();
   });
 
-  it("shows and hides details when toggle link is clicked", () => {
+  it("shows and hides details when toggle link is clicked", async () => {
     const error = createMockError();
 
-    render(<ExceptionLayout e={error} />);
+    await act(async () => {
+      render(<ExceptionLayout e={error} />);
+    });
 
     // Initially details should be hidden
     expect(screen.queryByText("Endpoint")).not.toBeInTheDocument();
     expect(screen.getByText("Show Details")).toBeInTheDocument();
 
     // Click to show details
-    fireEvent.click(screen.getByTestId("fluent-link"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("fluent-link"));
+    });
 
     // Details should now be visible
     expect(screen.getByText("Endpoint")).toBeInTheDocument();
@@ -85,64 +96,82 @@ describe("ExceptionLayout Component", () => {
     expect(screen.getByText("Test exception details")).toBeInTheDocument();
 
     // Click to hide details
-    fireEvent.click(screen.getByTestId("fluent-link"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("fluent-link"));
+    });
 
     // Details should be hidden again
     expect(screen.queryByText("Endpoint")).not.toBeInTheDocument();
     expect(screen.getByText("Show Details")).toBeInTheDocument();
   });
 
-  it("displays '(none)' for missing status code", () => {
+  it("displays '(none)' for missing status code", async () => {
     const error = createMockError({ status: undefined });
 
-    render(<ExceptionLayout e={error} />);
+    await act(async () => {
+      render(<ExceptionLayout e={error} />);
+    });
 
     // Show details to see the status code
-    fireEvent.click(screen.getByTestId("fluent-link"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("fluent-link"));
+    });
 
     expect(screen.getByText("(none)")).toBeInTheDocument();
   });
 
-  it("dismisses the message bar when dismiss button is clicked", () => {
+  it("dismisses the message bar when dismiss button is clicked", async () => {
     const error = createMockError();
 
-    render(<ExceptionLayout e={error} />);
+    await act(async () => {
+      render(<ExceptionLayout e={error} />);
+    });
 
     expect(screen.getByTestId("message-bar")).toBeInTheDocument();
 
     // Click dismiss button
-    fireEvent.click(screen.getByTestId("dismiss-button"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("dismiss-button"));
+    });
 
     // Message bar should be hidden
     expect(screen.queryByTestId("message-bar")).not.toBeInTheDocument();
   });
 
-  it("renders correct icons for show/hide details", () => {
+  it("renders correct icons for show/hide details", async () => {
     const error = createMockError();
 
-    render(<ExceptionLayout e={error} />);
+    await act(async () => {
+      render(<ExceptionLayout e={error} />);
+    });
 
     // Initially should show ChevronDown icon
     expect(screen.getByTestId("icon-ChevronDown")).toHaveAttribute("data-icon-name", "ChevronDown");
 
     // Click to show details
-    fireEvent.click(screen.getByTestId("fluent-link"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("fluent-link"));
+    });
 
     // Should now show ChevronUp icon
     expect(screen.getByTestId("icon-ChevronUp")).toHaveAttribute("data-icon-name", "ChevronUp");
   });
 
-  it("handles missing error properties gracefully", () => {
+  it("handles missing error properties gracefully", async () => {
     const error = new APIError();
     error.status = 500;
     // Don't set other properties
 
-    render(<ExceptionLayout e={error} />);
+    await act(async () => {
+      render(<ExceptionLayout e={error} />);
+    });
 
     expect(screen.getByTestId("message-bar")).toBeInTheDocument();
 
     // Show details to check undefined values are handled
-    fireEvent.click(screen.getByTestId("fluent-link"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("fluent-link"));
+    });
 
     expect(screen.getByText("Status Code")).toBeInTheDocument();
     expect(screen.getByText("500")).toBeInTheDocument();
