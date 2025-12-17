@@ -29,8 +29,6 @@ export const CostsTag: React.FunctionComponent<CostsTagProps> = (
   );
 
   useEffect(() => {
-    let isMounted = true;
-    setLoadingState(LoadingState.Loading);
     async function fetchCostData() {
       let costs: CostResource[] = [];
       if (workspaceCtx.costs.length > 0) {
@@ -51,60 +49,53 @@ export const CostsTag: React.FunctionComponent<CostsTagProps> = (
           minimumFractionDigits: 2,
           maximumFractionDigits: 2,
         }).format(resourceCosts.costs[0].cost);
-        if (isMounted) setFormattedCost(formattedCost);
+        setFormattedCost(formattedCost);
       }
-    } catch (e) {
-      // error handled by fallback UI
-    } finally {
-      if (isMounted) setLoadingState(LoadingState.Ok);
+      setLoadingState(LoadingState.Ok);
     }
-  }
     fetchCostData();
-  return () => {
-    isMounted = false;
+  }, [
+    apiCall,
+    props.resourceId,
+    workspaceCtx.costs,
+    costsCtx.costs,
+    workspaceCtx.workspace.id,
+  ]);
+
+  // Generate tooltip content based on resource type and cost availability
+  const getTooltipContent = () => {
+    if (!formattedCost) {
+      return "Cost data not yet available";
+    }
+
+    let baseMessage = "Month-to-date costs";
+
+    if (props.resourceType === ResourceType.Workspace) {
+      baseMessage += " (includes all workspace services and user resources)";
+    }
+
+    return baseMessage;
   };
-}, [
-  apiCall,
-  props.resourceId,
-  workspaceCtx.costs,
-  costsCtx.costs,
-  workspaceCtx.workspace.id,
-]);
 
-// Generate tooltip content based on resource type and cost availability
-const getTooltipContent = () => {
-  if (!formattedCost) {
-    return "Cost data not yet available";
-  }
+  const costBadge = (
+    <Stack.Item style={{ maxHeight: 18 }} className="tre-badge">
+      {loadingState === LoadingState.Loading ? (
+        <Shimmer />
+      ) : (
+        <>
+          {formattedCost ? (
+            <TooltipHost content={getTooltipContent()}>
+              {formattedCost}
+            </TooltipHost>
+          ) : (
+            <TooltipHost content={getTooltipContent()}>
+              <Icon iconName="Clock" />
+            </TooltipHost>
+          )}
+        </>
+      )}
+    </Stack.Item>
+  );
 
-  let baseMessage = "Month-to-date costs";
-
-  if (props.resourceType === ResourceType.Workspace) {
-    baseMessage += " (includes all workspace services and user resources)";
-  }
-
-  return baseMessage;
-};
-
-const costBadge = (
-  <Stack.Item style={{ maxHeight: 18 }} className="tre-badge">
-    {loadingState === LoadingState.Loading ? (
-      <Shimmer />
-    ) : (
-      <>
-        {formattedCost ? (
-          <TooltipHost content={getTooltipContent()}>
-            {formattedCost}
-          </TooltipHost>
-        ) : (
-          <TooltipHost content={getTooltipContent()}>
-            <Icon iconName="Clock" />
-          </TooltipHost>
-        )}
-      </>
-    )}
-  </Stack.Item>
-);
-
-return costBadge;
+  return costBadge;
 };
