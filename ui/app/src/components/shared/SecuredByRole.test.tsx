@@ -5,7 +5,8 @@ import {
   screen,
   waitFor,
   createApiEndpointsMock,
-  createPartialFluentUIMock
+  createPartialFluentUIMock,
+  act
 } from "../../test-utils";
 import { SecuredByRole } from "./SecuredByRole";
 import { WorkspaceContext } from "../../contexts/WorkspaceContext";
@@ -96,98 +97,112 @@ describe("SecuredByRole Component", () => {
     vi.clearAllMocks();
   });
 
-  it("renders secured content when user has required workspace role", () => {
-    renderWithContexts(
-      <SecuredByRole
-        element={<TestElement />}
-        allowedWorkspaceRoles={["workspace_researcher"]}
-      />,
-      ["workspace_researcher"], // user has this role
-      []
-    );
+  it("renders secured content when user has required workspace role", async () => {
+    await act(async () => {
+      renderWithContexts(
+        <SecuredByRole
+          element={<TestElement />}
+          allowedWorkspaceRoles={["workspace_researcher"]}
+        />,
+        ["workspace_researcher"], // user has this role
+        []
+      );
+    });
 
     expect(screen.getByTestId("secured-content")).toBeInTheDocument();
   });
 
-  it("renders secured content when user has required app role", () => {
-    renderWithContexts(
-      <SecuredByRole
-        element={<TestElement />}
-        allowedAppRoles={["TREAdmin"]}
-      />,
-      [],
-      ["TREAdmin"] // user has this role
-    );
+  it("renders secured content when user has required app role", async () => {
+    await act(async () => {
+      renderWithContexts(
+        <SecuredByRole
+          element={<TestElement />}
+          allowedAppRoles={["TREAdmin"]}
+        />,
+        [],
+        ["TREAdmin"] // user has this role
+      );
+    });
 
     expect(screen.getByTestId("secured-content")).toBeInTheDocument();
   });
 
-  it("renders secured content when user has any of multiple allowed workspace roles", () => {
-    renderWithContexts(
-      <SecuredByRole
-        element={<TestElement />}
-        allowedWorkspaceRoles={["workspace_owner", "workspace_researcher"]}
-      />,
-      ["workspace_researcher"], // user has one of the allowed roles
-      []
-    );
+  it("renders secured content when user has any of multiple allowed workspace roles", async () => {
+    await act(async () => {
+      renderWithContexts(
+        <SecuredByRole
+          element={<TestElement />}
+          allowedWorkspaceRoles={["workspace_owner", "workspace_researcher"]}
+        />,
+        ["workspace_researcher"], // user has one of the allowed roles
+        []
+      );
+    });
 
     expect(screen.getByTestId("secured-content")).toBeInTheDocument();
   });
 
-  it("renders secured content when user has any of multiple allowed app roles", () => {
-    renderWithContexts(
-      <SecuredByRole
-        element={<TestElement />}
-        allowedAppRoles={["TREAdmin", "TREUser"]}
-      />,
-      [],
-      ["TREUser"] // user has one of the allowed roles
-    );
+  it("renders secured content when user has any of multiple allowed app roles", async () => {
+    await act(async () => {
+      renderWithContexts(
+        <SecuredByRole
+          element={<TestElement />}
+          allowedAppRoles={["TREAdmin", "TREUser"]}
+        />,
+        [],
+        ["TREUser"] // user has one of the allowed roles
+      );
+    });
 
     expect(screen.getByTestId("secured-content")).toBeInTheDocument();
   });
 
-  it("renders secured content when user has both workspace and app roles", () => {
-    renderWithContexts(
-      <SecuredByRole
-        element={<TestElement />}
-        allowedWorkspaceRoles={["workspace_owner"]}
-        allowedAppRoles={["TREAdmin"]}
-      />,
-      ["workspace_researcher"], // doesn't have workspace role
-      ["TREAdmin"] // but has app role
-    );
+  it("renders secured content when user has both workspace and app roles", async () => {
+    await act(async () => {
+      renderWithContexts(
+        <SecuredByRole
+          element={<TestElement />}
+          allowedWorkspaceRoles={["workspace_owner"]}
+          allowedAppRoles={["TREAdmin"]}
+        />,
+        ["workspace_researcher"], // doesn't have workspace role
+        ["TREAdmin"] // but has app role
+      );
+    });
 
     expect(screen.getByTestId("secured-content")).toBeInTheDocument();
   });
 
-  it("does not render content when user lacks required roles", () => {
-    renderWithContexts(
-      <SecuredByRole
-        element={<TestElement />}
-        allowedWorkspaceRoles={["workspace_owner"]}
-        allowedAppRoles={["TREAdmin"]}
-      />,
-      ["workspace_researcher"], // doesn't have required workspace role
-      ["TREUser"] // doesn't have required app role
-    );
+  it("does not render content when user lacks required roles", async () => {
+    await act(async () => {
+      renderWithContexts(
+        <SecuredByRole
+          element={<TestElement />}
+          allowedWorkspaceRoles={["workspace_owner"]}
+          allowedAppRoles={["TREAdmin"]}
+        />,
+        ["workspace_researcher"], // doesn't have required workspace role
+        ["TREUser"] // doesn't have required app role
+      );
+    });
 
     expect(screen.queryByTestId("secured-content")).not.toBeInTheDocument();
   });
 
-  it("renders error message when user lacks required roles and errorString is provided", () => {
+  it("renders error message when user lacks required roles and errorString is provided", async () => {
     const errorMessage = "You need admin access to view this content";
 
-    renderWithContexts(
-      <SecuredByRole
-        element={<TestElement />}
-        allowedWorkspaceRoles={["workspace_owner"]}
-        errorString={errorMessage}
-      />,
-      ["workspace_researcher"], // doesn't have required role
-      []
-    );
+    await act(async () => {
+      renderWithContexts(
+        <SecuredByRole
+          element={<TestElement />}
+          allowedWorkspaceRoles={["workspace_owner"]}
+          errorString={errorMessage}
+        />,
+        ["workspace_researcher"], // doesn't have required role
+        []
+      );
+    });
 
     expect(screen.queryByTestId("secured-content")).not.toBeInTheDocument();
     expect(screen.getByTestId("message-bar")).toBeInTheDocument();
@@ -195,18 +210,20 @@ describe("SecuredByRole Component", () => {
     expect(screen.getByText(errorMessage)).toBeInTheDocument();
   });
 
-  it("does not render error message when user has no roles loaded yet", () => {
+  it("does not render error message when user has no roles loaded yet", async () => {
     const errorMessage = "You need admin access to view this content";
 
-    renderWithContexts(
-      <SecuredByRole
-        element={<TestElement />}
-        allowedWorkspaceRoles={["workspace_owner"]}
-        errorString={errorMessage}
-      />,
-      [], // no roles loaded yet
-      [] // no app roles loaded yet
-    );
+    await act(async () => {
+      renderWithContexts(
+        <SecuredByRole
+          element={<TestElement />}
+          allowedWorkspaceRoles={["workspace_owner"]}
+          errorString={errorMessage}
+        />,
+        [], // no roles loaded yet
+        [] // no app roles loaded yet
+      );
+    });
 
     expect(screen.queryByTestId("secured-content")).not.toBeInTheDocument();
     expect(screen.queryByTestId("message-bar")).not.toBeInTheDocument();
