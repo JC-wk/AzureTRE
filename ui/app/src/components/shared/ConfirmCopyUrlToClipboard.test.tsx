@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor, createCompleteFluentUIMock, mockClipboardAPI, act } from "../../test-utils";
+import { render, screen, fireEvent, waitFor, createCompleteFluentUIMock, mockClipboardAPI } from "../../test-utils";
 import { ConfirmCopyUrlToClipboard } from "./ConfirmCopyUrlToClipboard";
 import { Resource } from "../../models/resource";
 import { ResourceType } from "../../models/resourceType";
@@ -99,9 +99,7 @@ describe("ConfirmCopyUrlToClipboard Component", () => {
     );
 
     const copyButton = screen.getByTestId("primary-button");
-    await act(async () => {
-      fireEvent.click(copyButton);
-    });
+    fireEvent.click(copyButton);
 
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
       "https://test-connection.example.com"
@@ -114,9 +112,7 @@ describe("ConfirmCopyUrlToClipboard Component", () => {
     );
 
     const copyButton = screen.getByTestId("primary-button");
-    await act(async () => {
-      fireEvent.click(copyButton);
-    });
+    fireEvent.click(copyButton);
 
     // Should show "Copied" message
     await waitFor(() => {
@@ -130,15 +126,13 @@ describe("ConfirmCopyUrlToClipboard Component", () => {
     expect(true).toBe(true);
   });
 
-  it("calls onDismiss when close button is clicked", async () => {
+  it("calls onDismiss when close button is clicked", () => {
     render(
       <ConfirmCopyUrlToClipboard resource={mockResource} onDismiss={mockOnDismiss} />
     );
 
     const closeButton = screen.getByTestId("dialog-close");
-    await act(async () => {
-      fireEvent.click(closeButton);
-    });
+    fireEvent.click(closeButton);
 
     expect(mockOnDismiss).toHaveBeenCalledTimes(1);
   });

@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor, createPartialFluentUIMock, act } from "../../test-utils";
+import { render, screen, fireEvent, waitFor, createPartialFluentUIMock } from "../../test-utils";
 import { ConfirmDisableEnableResource } from "./ConfirmDisableEnableResource";
 import { Resource } from "../../models/resource";
 import { ResourceType } from "../../models/resourceType";
@@ -162,7 +162,7 @@ describe("ConfirmDisableEnableResource Component", () => {
     expect(screen.getByTestId("primary-button")).toHaveTextContent("Enable");
   });
 
-  it("calls onDismiss when cancel button is clicked", async () => {
+  it("calls onDismiss when cancel button is clicked", () => {
     renderWithWorkspaceContext(
       <ConfirmDisableEnableResource
         resource={mockResource}
@@ -171,9 +171,7 @@ describe("ConfirmDisableEnableResource Component", () => {
       />
     );
 
-    await act(async () => {
-      fireEvent.click(screen.getByTestId("default-button"));
-    });
+    fireEvent.click(screen.getByTestId("default-button"));
     expect(mockOnDismiss).toHaveBeenCalledTimes(1);
   });
 
@@ -189,9 +187,7 @@ describe("ConfirmDisableEnableResource Component", () => {
       />
     );
 
-    await act(async () => {
-      fireEvent.click(screen.getByTestId("primary-button"));
-    });
+    fireEvent.click(screen.getByTestId("primary-button"));
 
     await waitFor(() => {
       expect(mockApiCall).toHaveBeenCalledWith(
@@ -223,9 +219,7 @@ describe("ConfirmDisableEnableResource Component", () => {
       />
     );
 
-    await act(async () => {
-      fireEvent.click(screen.getByTestId("primary-button"));
-    });
+    fireEvent.click(screen.getByTestId("primary-button"));
 
     expect(screen.getByTestId("spinner")).toBeInTheDocument();
     expect(screen.getByText("Sending request...")).toBeInTheDocument();
@@ -243,9 +237,7 @@ describe("ConfirmDisableEnableResource Component", () => {
       />
     );
 
-    await act(async () => {
-      fireEvent.click(screen.getByTestId("primary-button"));
-    });
+    fireEvent.click(screen.getByTestId("primary-button"));
 
     await waitFor(() => {
       expect(screen.getByTestId("exception-layout")).toBeInTheDocument();
@@ -265,9 +257,7 @@ describe("ConfirmDisableEnableResource Component", () => {
       />
     );
 
-    await act(async () => {
-      fireEvent.click(screen.getByTestId("primary-button"));
-    });
+    fireEvent.click(screen.getByTestId("primary-button"));
 
     await waitFor(() => {
       expect(mockApiCall).toHaveBeenCalledWith(
@@ -299,9 +289,7 @@ describe("ConfirmDisableEnableResource Component", () => {
       />
     );
 
-    await act(async () => {
-      fireEvent.click(screen.getByTestId("primary-button"));
-    });
+    fireEvent.click(screen.getByTestId("primary-button"));
 
     await waitFor(() => {
       expect(mockApiCall).toHaveBeenCalledWith(

@@ -144,7 +144,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   render,
   screen,
-  fireEvent
+  fireEvent,
+  act
 } from "../../test-utils";
 import { ResourceCard } from "./ResourceCard";
 import { Resource, ComponentAction, VMPowerStates } from "../../models/resource";
@@ -411,7 +412,7 @@ describe("ResourceCard Component", () => {
     expect(screen.queryByTestId("primary-button")).not.toBeInTheDocument();
   });
 
-  it("prevents card click when authentication not provisioned for non-admin", () => {
+  it("prevents card click when authentication not provisioned for non-admin", async () => {
     const workspaceWithoutAuth = {
       ...mockResource,
       resourceType: ResourceType.Workspace,
@@ -426,11 +427,13 @@ describe("ResourceCard Component", () => {
       roles: [], // No admin role
     };
 
-    renderWithContexts(
-      <ResourceCard {...defaultProps} resource={workspaceWithoutAuth} />,
-      mockWorkspaceContext,
-      nonAdminContext
-    );
+    await act(async () => {
+      renderWithContexts(
+        <ResourceCard {...defaultProps} resource={workspaceWithoutAuth} />,
+        mockWorkspaceContext,
+        nonAdminContext
+      );
+    });
 
     const card = screen.getByTestId("clickable-stack");
     fireEvent.click(card);
