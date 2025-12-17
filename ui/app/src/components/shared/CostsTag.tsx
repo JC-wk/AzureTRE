@@ -69,11 +69,11 @@ export const CostsTag: React.FunctionComponent<CostsTagProps> = (
     }
 
     let baseMessage = "Month-to-date costs";
-    
+
     if (props.resourceType === ResourceType.Workspace) {
       baseMessage += " (includes all workspace services and user resources)";
     }
-    
+
     return baseMessage;
   };
 
