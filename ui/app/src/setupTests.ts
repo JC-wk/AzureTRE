@@ -2,6 +2,25 @@ import "@testing-library/jest-dom";
 import { expect, beforeAll, vi } from "vitest";
 import React from "react";
 
+// Mock MSAL React globally to avoid real provider state updates during tests
+vi.mock("@azure/msal-react", () => {
+  const React = require("react");
+
+  return {
+    MsalProvider: ({ children }: { children: React.ReactNode }) => React.createElement(React.Fragment, null, children),
+    MsalAuthenticationTemplate: ({ children }: { children: React.ReactNode }) => React.createElement(React.Fragment, null, children),
+    useMsal: () => ({
+      instance: {
+        acquireTokenSilent: async () => ({ accessToken: "test-token" }),
+        acquireTokenPopup: async () => ({ accessToken: "test-token" }),
+        logout: async () => { },
+      },
+      accounts: [],
+    }),
+    useAccount: () => null,
+  };
+});
+
 // Setup global mocks
 beforeAll(() => {
   // Mock ResizeObserver which is not available in jsdom

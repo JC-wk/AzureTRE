@@ -23,10 +23,7 @@ vi.mock("../../hooks/customReduxHooks", () => ({
 
 vi.mock("../shared/notifications/operationsSlice", () => ({
   addUpdateOperation: vi.fn(),
-  default: {
-    name: 'operations',
-    reducer: vi.fn()
-  }
+  default: (state: any = { items: [] }) => state
 }));
 
 // Mock FluentUI components using centralized mocks

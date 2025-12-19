@@ -21,42 +21,30 @@ vi.mock("./authConfig", () => ({
 }));
 
 // Mock MSAL instance more thoroughly to prevent network calls
-vi.mock("@azure/msal-browser", () => ({
-  PublicClientApplication: vi.fn().mockImplementation(() => ({
-    initialize: vi.fn().mockResolvedValue(undefined),
-    getAllAccounts: vi.fn().mockReturnValue([]),
-    getActiveAccount: vi.fn().mockReturnValue(null),
-    addEventCallback: vi.fn(),
-    removeEventCallback: vi.fn(),
-    getConfiguration: vi.fn().mockReturnValue({
+vi.mock("@azure/msal-browser", async () => {
+  const actual = await vi.importActual("@azure/msal-browser");
+  class MockPublicClientApplication {
+    constructor() {
+      // Mock the constructor
+    }
+    initialize = vi.fn().mockResolvedValue(undefined);
+    getAllAccounts = vi.fn().mockReturnValue([]);
+    getActiveAccount = vi.fn().mockReturnValue(null);
+    addEventCallback = vi.fn();
+    removeEventCallback = vi.fn();
+    getConfiguration = vi.fn().mockReturnValue({
       auth: {
         clientId: "test-client-id",
         authority: "https://login.microsoftonline.com/test-tenant",
       },
-    }),
-  })),
-  AuthenticationResult: vi.fn(),
-  InteractionRequiredAuthError: vi.fn(),
-  InteractionType: {
-    Redirect: "redirect",
-    Popup: "popup",
-    Silent: "silent",
-  },
-}));
+    });
+  }
 
-// Mock MSAL React components
-vi.mock("@azure/msal-react", () => ({
-  MsalProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  MsalAuthenticationTemplate: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  useMsal: vi.fn(() => ({
-    instance: {
-      getAllAccounts: vi.fn().mockReturnValue([]),
-      getActiveAccount: vi.fn().mockReturnValue(null),
-    },
-    accounts: [],
-  })),
-  useAccount: vi.fn(() => null),
-}));
+  return {
+    ...actual,
+    PublicClientApplication: MockPublicClientApplication,
+  };
+});
 
 // Mock the API hook
 vi.mock("./hooks/useAuthApiCall", () => ({
