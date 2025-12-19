@@ -160,13 +160,14 @@ export const createFluentUIMocks = () => ({
     </button>
   ),
 
-  IconButton: ({ iconProps, onClick, styles, disabled, title, ...props }: any) => (
+  IconButton: ({ iconProps, onClick, styles, disabled, title, ariaLabel, ...props }: any) => (
     <button
       data-testid="icon-button"
       data-icon-name={iconProps?.iconName}
       onClick={onClick}
       disabled={disabled}
       title={title}
+      aria-label={ariaLabel}
       style={styles?.root}
       {...props}
     >
@@ -391,7 +392,7 @@ export const createFluentUIMocks = () => ({
     </div>
   ),
 
-  Modal: ({ isOpen, children, onDismiss, isBlocking, titleAriaId, styles, ...props }: any) =>
+  Modal: ({ isOpen, children, onDismiss, isBlocking, titleAriaId, styles, containerClassName, ...props }: any) =>
     isOpen ? (
       <div
         data-testid="modal"
@@ -402,15 +403,6 @@ export const createFluentUIMocks = () => ({
         {...props}
       >
         {children}
-        {onDismiss && (
-          <button
-            data-testid="modal-close"
-            onClick={onDismiss}
-            aria-label="Close popup modal"
-          >
-            X
-          </button>
-        )}
       </div>
     ) : null,
 

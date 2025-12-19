@@ -17,27 +17,12 @@ vi.mock("../../hooks/useAuthApiCall", () => ({
   ResultType: { JSON: "JSON" },
 }));
 
-// Mock the operations slice
-const mockOperationsSlice = {
-  name: "operations",
-  reducer: (state: any = { operations: [] }, action: any) => {
-    switch (action.type) {
-      case "operations/addUpdateOperation":
-        return { ...state, operations: [...state.operations, action.payload] };
-      default:
-        return state;
-    }
-  },
-};
-
 // Mock addUpdateOperation function
 const mockAddUpdateOperation = vi.fn();
+
 vi.mock("../shared/notifications/operationsSlice", () => ({
   addUpdateOperation: (...args: any[]) => mockAddUpdateOperation(...args),
-  default: {
-    name: 'operations',
-    reducer: vi.fn()
-  }
+  default: (state: any = { items: [] }) => state
 }));
 
 // Mock FluentUI components - only the ones we need for this test
@@ -106,7 +91,7 @@ const mockWorkspaceContext = {
 const createTestStore = () => {
   return configureStore({
     reducer: {
-      operations: mockOperationsSlice.reducer,
+      operations: (state: any = { items: [] }) => state,
     },
   });
 };

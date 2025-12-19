@@ -28,13 +28,15 @@ vi.mock("@azure/msal-react", () => ({
 // Mock FluentUI components
 vi.mock("@fluentui/react", () => ({
   PrimaryButton: ({ children, menuProps, onClick, style }: any) => (
-    <button
-      data-testid="primary-button"
-      onClick={onClick}
-      style={style}
-      data-menu={menuProps ? "true" : "false"}
-    >
-      {children}
+    <>
+      <button
+        data-testid="primary-button"
+        onClick={onClick}
+        style={style}
+        data-menu={menuProps ? "true" : "false"}
+      >
+        {children}
+      </button>
       {menuProps && (
         <div data-testid="menu-items">
           {menuProps.items.map((item: any) => (
@@ -48,7 +50,7 @@ vi.mock("@fluentui/react", () => ({
           ))}
         </div>
       )}
-    </button>
+    </>
   ),
   Persona: ({ text, size, imageAlt }: any) => (
     <div data-testid="persona" data-size={size} data-alt={imageAlt}>

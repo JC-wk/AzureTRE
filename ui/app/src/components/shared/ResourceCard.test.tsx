@@ -27,7 +27,7 @@ vi.mock("react-router-dom", async () => {
 
 // Mock useComponentManager hook
 vi.mock("../../hooks/useComponentManager", () => ({
-  useComponentManager: () => globalThis.__mockUseComponentManager(),
+  useComponentManager: () => globalThis.__mockUseComponentManager,
 }));
 
 // Mock child components
@@ -78,7 +78,7 @@ vi.mock("moment", () => ({
 // Mock FluentUI components - Use async importActual to maintain all exports
 vi.mock("@fluentui/react", async () => {
   const actual = await vi.importActual("@fluentui/react");
-  
+
   // Create custom mock components
   const MockStack = ({ children, horizontal, styles, onClick }: any) => (
     <div
@@ -90,7 +90,7 @@ vi.mock("@fluentui/react", async () => {
       {children}
     </div>
   );
-  
+
   // Add Item property to Stack
   MockStack.Item = ({ children, align, grow, styles }: any) => (
     <div
@@ -102,7 +102,7 @@ vi.mock("@fluentui/react", async () => {
       {children}
     </div>
   );
-  
+
   return {
     ...actual,
     Stack: MockStack,
@@ -125,7 +125,7 @@ vi.mock("@fluentui/react", async () => {
     TooltipHost: ({ content, children }: any) => (
       <div data-testid="tooltip" title={content}>{children}</div>
     ),
-    Callout: ({ children, hidden }: any) => 
+    Callout: ({ children, hidden }: any) =>
       !hidden ? <div data-testid="callout">{children}</div> : null,
     Text: ({ children }: any) => <span>{children}</span>,
     Link: ({ children }: any) => <a data-testid="fluent-link">{children}</a>,
