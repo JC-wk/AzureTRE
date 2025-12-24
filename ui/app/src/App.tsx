@@ -192,6 +192,4 @@ const stackStyles: IStackStyles = {
   },
 };
 
-export const Admin: React.FunctionComponent = () => {
-  return <h1>Admin (wip)</h1>;
-};
+export { default as Admin } from "./components/shared/admin/Admin";

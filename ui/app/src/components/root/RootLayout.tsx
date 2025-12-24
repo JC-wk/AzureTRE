@@ -161,7 +161,10 @@ export const RootLayout: React.FunctionComponent = () => {
                     />
                   }
                 />
-                <Route path="/admin" element={<Admin />} />
+                <Route
+                  path="/admin"
+                  element={<SecuredByRole element={<Admin />} allowedAppRoles={[RoleName.TREAdmin]} errorString={"You must be a TRE Admin to access this area"} />}
+                />
                 <Route
                   path="/shared-services/*"
                   element={

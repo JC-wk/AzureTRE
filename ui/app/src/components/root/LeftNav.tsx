@@ -32,6 +32,12 @@ export const LeftNav: React.FunctionComponent = () => {
       key: "shared-services",
       icon: "Puzzle",
     });
+    navLinkGroups[0].links.push({
+      name: "Admin",
+      url: "/admin",
+      key: "admin",
+      icon: "Settings",
+    });
   }
 
   const requestsLinkArray: {
