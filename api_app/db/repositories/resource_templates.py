@@ -47,7 +47,7 @@ class ResourceTemplateRepository(BaseRepository):
         :param user_roles: If set, only return templates that the user is authorized to use.
                            template.authorizedRoles should contain at least one of user_roles
         """
-        query = 'SELECT c.name, c.title, c.description, c.authorizedRoles FROM c WHERE c.resourceType = @resourceType AND c.current = true'
+        query = 'SELECT c.name, c.title, c.description, c.authorizedRoles, c.version, c.resourceType, c.parentWorkspaceService FROM c WHERE c.resourceType = @resourceType AND c.current = true'
         parameters = [
             {'name': '@resourceType', 'value': resource_type}
         ]
@@ -61,6 +61,15 @@ class ResourceTemplateRepository(BaseRepository):
             return templates
         # User can view template if they have at least one of authorizedRoles
         return [t for t in templates if not t.authorizedRoles or len(set(t.authorizedRoles).intersection(set(user_roles))) > 0]
+
+    async def get_all_templates_information(self) -> List[ResourceTemplateInformation]:
+        """
+        Returns name/title/description for all templates of all types
+        """
+        query = 'SELECT c.name, c.title, c.description, c.authorizedRoles, c.version, c.resourceType, c.parentWorkspaceService FROM c'
+        template_infos = await self.query(query=query)
+        templates = [parse_obj_as(ResourceTemplateInformation, info) for info in template_infos]
+        return templates
 
     async def get_current_template(self, template_name: str, resource_type: ResourceType, parent_service_name: str = "") -> Union[ResourceTemplate, UserResourceTemplate]:
         """
@@ -192,3 +201,16 @@ class ResourceTemplateRepository(BaseRepository):
 
                 if step_id != "main":
                     step_ids.append(step_id)
+
+    async def delete_template(self, template_name: str, resource_type: ResourceType, parent_service_name: Optional[str] = None) -> None:
+        query, parameters = self._template_by_name_query(template_name, resource_type)
+        if resource_type == ResourceType.UserResource:
+            query += ' AND c.parentWorkspaceService = @parentWorkspaceService'
+            parameters.append({'name': '@parentWorkspaceService', 'value': parent_service_name})
+        templates = await self.query(query=query, parameters=parameters)
+        for template in templates:
+            await self.delete_item(template["id"])
+
+    async def delete_template_by_version(self, template_name: str, version: str, resource_type: ResourceType, parent_service_name: Optional[str] = None) -> None:
+        template = await self.get_template_by_name_and_version(template_name, version, resource_type, parent_service_name)
+        await self.delete_item(template.id)

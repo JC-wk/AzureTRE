@@ -67,8 +67,8 @@ class TestWorkspaceServiceTemplatesRequiringAdminRights:
     @patch("api.routes.workspace_service_templates.ResourceTemplateRepository.get_templates_information")
     async def test_get_workspace_service_templates_returns_template_names_and_description(self, get_templates_info_mock, app, client):
         expected_template_infos = [
-            ResourceTemplateInformation(name="template1", title="template 1", description="description1"),
-            ResourceTemplateInformation(name="template2", title="template 2", description="description2")
+            ResourceTemplateInformation(name="template1", title="template 1", description="description1", version="1.0", resourceType=ResourceType.WorkspaceService),
+            ResourceTemplateInformation(name="template2", title="template 2", description="description2", version="1.0", resourceType=ResourceType.WorkspaceService)
         ]
         get_templates_info_mock.return_value = expected_template_infos
 
@@ -176,3 +176,17 @@ class TestWorkspaceServiceTemplatesRequiringAdminRights:
         response = await client.get(app.url_path_for(strings.API_GET_WORKSPACE_SERVICE_TEMPLATE_BY_NAME, service_template_name="template1"))
 
         assert response.status_code == expected_status
+
+    # DELETE /workspace-service-templates/{service_template_name}
+    @patch("api.routes.workspace_service_templates.ResourceTemplateRepository.delete_template")
+    async def test_delete_workspace_service_template_deletes_template(self, delete_template_mock, app, client):
+        response = await client.delete(app.url_path_for(strings.API_DELETE_WORKSPACE_SERVICE_TEMPLATE, service_template_name="template_name"))
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+        delete_template_mock.assert_called_once_with("template_name", ResourceType.WorkspaceService)
+
+    # DELETE /workspace-service-templates/{service_template_name}
+    @patch("api.routes.workspace_service_templates.ResourceTemplateRepository.delete_template_by_version")
+    async def test_delete_workspace_service_template_deletes_template_by_version(self, delete_template_by_version_mock, app, client):
+        response = await client.delete(app.url_path_for(strings.API_DELETE_WORKSPACE_SERVICE_TEMPLATE, service_template_name="template_name") + "?version=1.0")
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+        delete_template_by_version_mock.assert_called_once_with("template_name", "1.0", ResourceType.WorkspaceService)

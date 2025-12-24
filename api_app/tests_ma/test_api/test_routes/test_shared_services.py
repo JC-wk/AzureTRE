@@ -12,9 +12,11 @@ from .test_workspaces import FAKE_CREATE_TIMESTAMP, FAKE_UPDATE_TIMESTAMP, OPERA
 
 from db.errors import EntityDoesNotExist
 from models.domain.shared_service import SharedService
+from models.schemas.resource_template import ResourceTemplateInformation
 from resources import strings
 from services.authentication import get_current_admin_user, get_current_tre_user_or_tre_admin
 from azure.cosmos.exceptions import CosmosAccessConditionFailedError
+from models.domain.resource import ResourceType
 
 
 pytestmark = pytest.mark.asyncio

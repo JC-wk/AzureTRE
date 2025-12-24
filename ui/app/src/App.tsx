@@ -27,6 +27,7 @@ import { initializeFileTypeIcons } from "@fluentui/react-file-type-icons";
 import { CostResource } from "./models/costs";
 import { CostsContext } from "./contexts/CostsContext";
 import { LoadingState } from "./models/loadingState";
+import { Admin } from "./components/admin/Admin";
 
 export const App: React.FunctionComponent = () => {
   const [appRoles, setAppRoles] = useState([] as Array<string>);
@@ -124,6 +125,7 @@ export const App: React.FunctionComponent = () => {
                         >
                           <Routes>
                             <Route path="*" element={<RootLayout />} />
+                            <Route path="/admin" element={<Admin />} />
                             <Route
                               path="/workspaces/:workspaceId//*"
                               element={
@@ -190,8 +192,4 @@ const stackStyles: IStackStyles = {
     background: DefaultPalette.white,
     height: "100vh",
   },
-};
-
-export const Admin: React.FunctionComponent = () => {
-  return <h1>Admin (wip)</h1>;
 };

@@ -53,15 +53,18 @@ API_CREATE_AIRLOCK_REVIEW_USER_RESOURCE = "Create an Airlock Review User Resourc
 API_CREATE_WORKSPACE_TEMPLATES = "Register workspace template"
 API_GET_WORKSPACE_TEMPLATES = "Get workspace templates"
 API_GET_WORKSPACE_TEMPLATE_BY_NAME = "Get workspace template by name and optional version"
+API_DELETE_WORKSPACE_TEMPLATE = "Delete workspace template"
 
 API_CREATE_WORKSPACE_SERVICE_TEMPLATES = "Register workspace service template"
 API_GET_WORKSPACE_SERVICE_TEMPLATES = "Get workspace service templates"
 API_GET_WORKSPACE_SERVICE_TEMPLATES_IN_WORKSPACE = "Get workspace service templates (on workspace level)"  # only returns templates that the authenticated user is authorized to use
 API_GET_WORKSPACE_SERVICE_TEMPLATE_BY_NAME = "Get workspace service template by name and optional version"
+API_DELETE_WORKSPACE_SERVICE_TEMPLATE = "Delete workspace service template"
 
 API_CREATE_SHARED_SERVICE_TEMPLATES = "Register shared service template"
 API_GET_SHARED_SERVICE_TEMPLATES = "Get shared service templates"
 API_GET_SHARED_SERVICE_TEMPLATE_BY_NAME = "Get shared service template by name and optional version"
+API_DELETE_SHARED_SERVICE_TEMPLATE = "Delete shared service template"
 
 API_GET_ALL_SHARED_SERVICES = "Get all shared services"
 API_GET_SHARED_SERVICE_BY_ID = "Get shared service by ID"
@@ -74,6 +77,9 @@ API_CREATE_USER_RESOURCE_TEMPLATES = "Register user resource template"
 API_GET_USER_RESOURCE_TEMPLATES = "Get user resource templates applicable to the workspace service template"
 API_GET_USER_RESOURCE_TEMPLATES_IN_WORKSPACE = "Get user resource templates applicable to the workspace service template (on workspace level)"  # only returns templates that the authenticated user is authorized to use
 API_GET_USER_RESOURCE_TEMPLATE_BY_NAME = "Get user resource template by name and workspace service and optional version"
+API_DELETE_USER_RESOURCE_TEMPLATE = "Delete user resource template"
+
+API_GET_TEMPLATES = "Get all templates"
 
 # cost report
 API_GET_COSTS = "Get overall costs"

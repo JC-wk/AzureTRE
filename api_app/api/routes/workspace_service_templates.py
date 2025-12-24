@@ -36,3 +36,14 @@ async def register_workspace_service_template(template_input: WorkspaceServiceTe
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=strings.WORKSPACE_TEMPLATE_VERSION_EXISTS)
     except InvalidInput as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(e))
+
+
+@workspace_service_templates_core_router.delete("/workspace-service-templates/{service_template_name}", status_code=status.HTTP_204_NO_CONTENT, name=strings.API_DELETE_WORKSPACE_SERVICE_TEMPLATE)
+async def delete_workspace_service_template(service_template_name: str, version: Optional[str] = None, template_repo=Depends(get_repository(ResourceTemplateRepository))):
+    try:
+        if version:
+            await template_repo.delete_template_by_version(service_template_name, version, ResourceType.WorkspaceService)
+        else:
+            await template_repo.delete_template(service_template_name, ResourceType.WorkspaceService)
+    except EntityDoesNotExist:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=strings.WORKSPACE_SERVICE_TEMPLATE_DOES_NOT_EXIST)

@@ -39,3 +39,14 @@ async def register_shared_service_template(template_input: SharedServiceTemplate
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=strings.SHARED_SERVICE_TEMPLATE_VERSION_EXISTS)
     except InvalidInput as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(e))
+
+
+@shared_service_templates_core_router.delete("/shared-service-templates/{shared_service_template_name}", status_code=status.HTTP_204_NO_CONTENT, name=strings.API_DELETE_SHARED_SERVICE_TEMPLATE)
+async def delete_shared_service_template(shared_service_template_name: str, version: Optional[str] = None, template_repo=Depends(get_repository(ResourceTemplateRepository))):
+    try:
+        if version:
+            await template_repo.delete_template_by_version(shared_service_template_name, version, ResourceType.SharedService)
+        else:
+            await template_repo.delete_template(shared_service_template_name, ResourceType.SharedService)
+    except EntityDoesNotExist:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=strings.SHARED_SERVICE_TEMPLATE_DOES_NOT_EXIST)

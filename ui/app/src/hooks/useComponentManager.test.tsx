@@ -5,16 +5,16 @@ import { ComponentAction, Resource } from "../models/resource";
 import { ResourceType } from "../models/resourceType";
 
 // Mock dependencies
-jest.mock("./useAuthApiCall", () => ({
-  useAuthApiCall: () => jest.fn(),
+vi.mock("./useAuthApiCall", () => ({
+  useAuthApiCall: () => vi.fn(),
   HttpMethod: { Get: "GET" },
 }));
 
-jest.mock("./customReduxHooks", () => ({
+vi.mock("./customReduxHooks", () => ({
   useAppSelector: () => ({ items: [] }),
 }));
 
-jest.mock("../contexts/WorkspaceContext", () => ({
+vi.mock("../contexts/WorkspaceContext", () => ({
   WorkspaceContext: React.createContext({}),
 }));
 
@@ -49,8 +49,8 @@ const mockResource2: Resource = {
 
 describe("useComponentManager", () => {
   it("should reset componentAction to None when resource changes", () => {
-    const mockOnUpdate = jest.fn();
-    const mockOnRemove = jest.fn();
+    const mockOnUpdate = vi.fn();
+    const mockOnRemove = vi.fn();
 
     const { result, rerender } = renderHook(
       ({ resource }: { resource: Resource }) =>
@@ -78,8 +78,8 @@ describe("useComponentManager", () => {
   });
 
   it("should reset componentAction when resource is changed", () => {
-    const mockOnUpdate = jest.fn();
-    const mockOnRemove = jest.fn();
+    const mockOnUpdate = vi.fn();
+    const mockOnRemove = vi.fn();
 
     const { result, rerender } = renderHook(
       ({ resource }: { resource: Resource }) =>

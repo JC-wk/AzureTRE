@@ -8,7 +8,7 @@ from fastapi.openapi.utils import get_openapi
 from api.helpers import get_repository
 from db.repositories.workspaces import WorkspaceRepository
 from api.routes import health, ping, workspaces, workspace_templates, workspace_service_templates, user_resource_templates, \
-    shared_services, shared_service_templates, migrations, costs, airlock, operations, metadata, requests, workspace_users
+    shared_services, shared_service_templates, migrations, costs, airlock, operations, metadata, requests, workspace_users, templates
 from core import config
 from resources import strings
 
@@ -42,6 +42,7 @@ core_router.include_router(workspace_templates.workspace_templates_admin_router,
 core_router.include_router(workspace_service_templates.workspace_service_templates_core_router, tags=["workspace service templates"])
 core_router.include_router(user_resource_templates.user_resource_templates_core_router, tags=["user resource templates"])
 core_router.include_router(shared_service_templates.shared_service_templates_core_router, tags=["shared service templates"])
+core_router.include_router(templates.templates_admin_router, tags=["templates"])
 core_router.include_router(shared_services.shared_services_router, tags=["shared services"])
 core_router.include_router(operations.operations_router, tags=["operations"])
 core_router.include_router(workspaces.workspaces_core_router, tags=["workspaces"])

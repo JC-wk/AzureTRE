@@ -48,8 +48,8 @@ class TestWorkspaceTemplate:
     @patch("api.routes.workspace_templates.ResourceTemplateRepository.get_templates_information")
     async def test_workspace_templates_returns_template_names_and_descriptions(self, get_template_infos_mock, app, client):
         expected_template_infos = [
-            ResourceTemplateInformation(name="template1", title="template 1", description="description1"),
-            ResourceTemplateInformation(name="template2", title="template 2", description="description2")
+            ResourceTemplateInformation(name="template1", title="template 1", description="description1", version="1.0", resourceType=ResourceType.Workspace),
+            ResourceTemplateInformation(name="template2", title="template 2", description="description2", version="1.0", resourceType=ResourceType.Workspace)
         ]
         get_template_infos_mock.return_value = expected_template_infos
 
@@ -222,3 +222,17 @@ class TestWorkspaceTemplate:
         await client.post(app.url_path_for(strings.API_CREATE_WORKSPACE_SERVICE_TEMPLATES), json=input_workspace_template.dict())
 
         create_template_mock.assert_called_once_with(input_workspace_template, ResourceType.WorkspaceService, '')
+
+    # DELETE /workspace-templates/{workspace_template_name}
+    @patch("api.routes.workspace_templates.ResourceTemplateRepository.delete_template")
+    async def test_delete_workspace_template_deletes_template(self, delete_template_mock, app, client):
+        response = await client.delete(app.url_path_for(strings.API_DELETE_WORKSPACE_TEMPLATE, workspace_template_name="template_name"))
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+        delete_template_mock.assert_called_once_with("template_name", ResourceType.Workspace)
+
+    # DELETE /workspace-templates/{workspace_template_name}
+    @patch("api.routes.workspace_templates.ResourceTemplateRepository.delete_template_by_version")
+    async def test_delete_workspace_template_deletes_template_by_version(self, delete_template_by_version_mock, app, client):
+        response = await client.delete(app.url_path_for(strings.API_DELETE_WORKSPACE_TEMPLATE, workspace_template_name="template_name") + "?version=1.0")
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+        delete_template_by_version_mock.assert_called_once_with("template_name", "1.0", ResourceType.Workspace)

@@ -1369,13 +1369,13 @@ class TestWorkspaceServiceRoutesThatRequireOwnerOrResearcherRights:
         assert response.status_code == status.HTTP_200_OK
 
     @patch("api.dependencies.workspaces.WorkspaceRepository.get_workspace_by_id")
-    @patch("api.routes.workspaces.ResourceTemplateRepository.get_templates_information", return_value=[ResourceTemplateInformation(name="test")])
+    @patch("api.routes.workspaces.ResourceTemplateRepository.get_templates_information", return_value=[ResourceTemplateInformation(name="test", version="1.0", resourceType=ResourceType.WorkspaceService)])
     async def test_get_workspace_service_templates_returns_templates(self, _, __, app, client):
         response = await client.get(app.url_path_for(strings.API_GET_WORKSPACE_SERVICE_TEMPLATES_IN_WORKSPACE, workspace_id=WORKSPACE_ID))
         assert response.status_code == status.HTTP_200_OK
 
     @patch("api.dependencies.workspaces.WorkspaceRepository.get_workspace_by_id")
-    @patch("api.routes.workspaces.ResourceTemplateRepository.get_templates_information", return_value=[ResourceTemplateInformation(name="test")])
+    @patch("api.routes.workspaces.ResourceTemplateRepository.get_templates_information", return_value=[ResourceTemplateInformation(name="test", version="1.0", resourceType=ResourceType.UserResource)])
     async def test_get_user_resource_templates_returns_templates(self, _, __, app, client):
         response = await client.get(app.url_path_for(strings.API_GET_USER_RESOURCE_TEMPLATES_IN_WORKSPACE, workspace_id=WORKSPACE_ID, service_template_name="guacamole"))
         assert response.status_code == status.HTTP_200_OK
