@@ -351,6 +351,20 @@ export const ConfirmUpgradeResource: React.FunctionComponent<
     return options;
   };
 
+  const checkFormValidity = () => {
+    if (newPropertiesToFill.length === 0) {
+      return true;
+    }
+    if (finalSchema) {
+      const { errors } = validator.validateFormData(
+        newPropertyValues,
+        finalSchema
+      );
+      return errors.length === 0;
+    }
+    return false; // schema not ready
+  };
+
   return (
     <>
       <Dialog
@@ -403,13 +417,7 @@ export const ConfirmUpgradeResource: React.FunctionComponent<
                 selectedKey={selectedVersion}
               />
               <PrimaryButton
-                primaryDisabled={
-                  !selectedVersion ||
-                  (newPropertiesToFill.length > 0 &&
-                    Object.values(newPropertyValues).some(
-                      (v) => v === "" || v === undefined,
-                    ))
-                }
+                primaryDisabled={!selectedVersion || !checkFormValidity()}
                 text="Upgrade"
                 onClick={() => upgradeCall()}
               />
