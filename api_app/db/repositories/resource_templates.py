@@ -114,6 +114,33 @@ class ResourceTemplateRepository(BaseRepository):
         versions = await self.query(query=query, parameters=parameters)
         return versions
 
+    async def get_all_templates(self) -> List[dict]:
+        """
+        Returns all templates (all types, all versions) with their basic information
+        """
+        query = 'SELECT c.id, c.name, c.title, c.description, c.version, c.resourceType, c.current FROM c'
+        templates = await self.query(query=query)
+        return templates
+
+    async def delete_template_by_id(self, template_id: str) -> None:
+        """
+        Deletes a specific template by its ID
+        """
+        await self.delete_item(template_id)
+
+    async def delete_templates_by_name(self, template_name: str, resource_type: ResourceType) -> int:
+        """
+        Deletes all versions of a template by name and resource type
+        Returns the count of deleted templates
+        """
+        query, parameters = self._template_by_name_query(template_name, resource_type)
+        templates = await self.query(query=query, parameters=parameters)
+
+        for template in templates:
+            await self.delete_item(template['id'])
+
+        return len(templates)
+
     async def create_template(self, template_input: ResourceTemplateInCreate, resource_type: ResourceType, parent_service_name: str = "") -> Union[ResourceTemplate, UserResourceTemplate]:
         """
         creates a template based on the input (workspace and workspace-services template)
