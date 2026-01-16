@@ -75,6 +75,8 @@ const Templates: React.FC<TemplatesProps> = ({ onClose }) => {
   }, []);
 
   const handleDeleteVersion = async (templateId: string, templateName: string, version: string) => {
+    if (inUseTemplates.has(getTemplateVersionKey(templateName, version))) return;
+
     if (!window.confirm(`Are you sure you want to delete version ${version} of ${templateName}?`)) return;
 
     try {
@@ -238,6 +240,8 @@ const Templates: React.FC<TemplatesProps> = ({ onClose }) => {
                             <DefaultButton
                               text="Delete Version"
                               onClick={() => handleDeleteVersion(template.id, template.name, template.version)}
+                              disabled={isVersionInUse}
+                              title={isVersionInUse ? "Cannot delete template version in use" : undefined}
                             />
                           </td>
                         </tr>

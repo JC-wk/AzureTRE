@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '../../../test-utils';
+import { render, screen, fireEvent, waitFor, act, within } from '../../../test-utils';
 import { Workspace } from '../../../models/workspace';
 import { ResourceType } from '../../../models/resourceType';
 import { ResultType } from '../../../hooks/useAuthApiCall';
@@ -39,8 +39,8 @@ vi.mock('@fluentui/react', async () => {
         {children}
       </div>
     ),
-    DefaultButton: ({ text, onClick }: any) => (
-      <button data-testid="default-button" onClick={onClick}>
+    DefaultButton: ({ text, onClick, disabled }: any) => (
+      <button data-testid="default-button" onClick={onClick} disabled={disabled}>
         {text}
       </button>
     ),
@@ -55,6 +55,10 @@ vi.mock('@fluentui/react', async () => {
       </button>
     ),
     Spinner: ({ label }: any) => <div>{label}</div>,
+    TooltipHost: ({ children }: any) => <div data-testid="tooltip-host">{children}</div>,
+    DirectionalHint: {
+      rightCenter: 'rightCenter'
+    }
   };
 });
 
@@ -136,11 +140,16 @@ describe('Templates Component', () => {
       if (url === 'templates') {
         return Promise.resolve([...mockWorkspaceTemplates, ...mockWorkspaceServiceTemplates]);
       }
-      if (url === 'workspaces') {
-        return Promise.resolve(mockWorkspaces);
-      }
-      if (url === 'shared-services') {
-        return Promise.resolve(mockSharedServices);
+      if (url === 'templates/usage') {
+        return Promise.resolve([
+          {
+            templateName: 'tre-workspace-base',
+            templateVersion: '0.1.0',
+            id: 'resource-1',
+            resourceType: ResourceType.Workspace,
+            displayName: 'Resource 1'
+          }
+        ]);
       }
       return Promise.resolve({});
     });
@@ -164,7 +173,7 @@ describe('Templates Component', () => {
 
     await waitFor(() => {
       expect(mockApiCall).toHaveBeenCalledWith('templates', 'GET');
-      expect(mockApiCall).toHaveBeenCalledWith('workspaces', 'GET');
+      expect(mockApiCall).toHaveBeenCalledWith('templates/usage', 'GET');
     });
   });
 
@@ -248,20 +257,22 @@ describe('Templates Component', () => {
     });
   });
 
-  it('prompts with a warning when deleting a single version of an in-use template', async () => {
+  it('disables "Delete Version" button for in-use template version', async () => {
     const confirmSpy = vi.spyOn(window, 'confirm');
     render(<Templates onClose={mockOnClose} />);
     await waitFor(() => {
       expect(screen.getByText('0.1.0')).toBeInTheDocument();
     });
 
-    // 0.2.0 is first (descending), 0.1.0 is second. 0.1.0 is in use.
-    const deleteButtons = screen.getAllByText('Delete Version');
-    fireEvent.click(deleteButtons[1]); // Click 0.1.0
+    // 0.1.0 is in use. Let's find its row.
+    const row010 = screen.getByText('0.1.0').closest('tr');
+    const deleteButton = within(row010!).getByText('Delete Version').closest('button');
+    expect(deleteButton).toBeDisabled();
 
-    expect(confirmSpy).toHaveBeenCalledWith(
-      'This specific version is in use by at least one workspace. Deleting it could cause issues.\n\nAre you sure you want to delete version 0.1.0 of tre-workspace-base?'
-    );
+    // Verify confirm is NOT called if we somehow click it
+    fireEvent.click(deleteButton!); 
+    expect(confirmSpy).not.toHaveBeenCalled();
+    
     confirmSpy.mockRestore();
   });
 
@@ -286,8 +297,7 @@ describe('Templates Component', () => {
     mockApiCall.mockImplementation((url: string, method: string) => {
       if (method === 'GET') {
           if (url === 'templates') return Promise.resolve([...mockWorkspaceTemplates, ...mockWorkspaceServiceTemplates]);
-          if (url === 'workspaces') return Promise.resolve(mockWorkspaces);
-          if (url === 'shared-services') return Promise.resolve(mockSharedServices);
+          if (url === 'templates/usage') return Promise.resolve([]);
       }
       if (url === '/templates/template-2-id' && method === 'DELETE') return Promise.resolve({});
       return Promise.reject(new Error(`Unexpected API call: ${method} ${url}`));
@@ -314,8 +324,7 @@ describe('Templates Component', () => {
     mockApiCall.mockImplementation((url: string, method: string) => {
         if (method === 'GET') {
             if (url === 'templates') return Promise.resolve([...mockWorkspaceTemplates, ...mockWorkspaceServiceTemplates]);
-            if (url === 'workspaces') return Promise.resolve(mockWorkspaces);
-            if (url === 'shared-services') return Promise.resolve(mockSharedServices);
+            if (url === 'templates/usage') return Promise.resolve([]);
         }
       if (url === `/templates/${ResourceType.WorkspaceService}/tre-service-guacamole` && method === 'DELETE') return Promise.resolve({});
       return Promise.reject(new Error(`Unexpected API call: ${method} ${url}`));
@@ -355,7 +364,7 @@ describe('Templates Component', () => {
       expect(screen.getByText('No templates found.')).toBeInTheDocument();
     });
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith('Error fetching templates or workspaces', expect.any(Error));
+    expect(consoleErrorSpy).toHaveBeenCalledWith('Error fetching templates or usage', expect.any(Error));
     consoleErrorSpy.mockRestore();
   });
 });
