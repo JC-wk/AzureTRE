@@ -6,6 +6,7 @@ from api.helpers import get_repository
 from db.errors import EntityDoesNotExist
 from db.repositories.operations import OperationRepository
 from db.repositories.resource_templates import ResourceTemplateRepository
+from db.repositories.resources import ResourceRepository
 from models.domain.resource import ResourceType
 from services.authentication import get_current_admin_user
 from resources import strings
@@ -26,6 +27,21 @@ async def delete_operation(operation_id: str,
     except EntityDoesNotExist:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=strings.OPERATION_DOES_NOT_EXIST)
     await operations_repo.delete_operation(operation)
+
+
+@admin_router.get("/templates/usage", name="get_template_usage", status_code=status.HTTP_200_OK)
+async def get_template_usage(
+    resource_repo: ResourceRepository = Depends(get_repository(ResourceRepository)),
+    current_user=Depends(get_current_admin_user)
+) -> List[dict]:
+    """
+    Get template usage (name, version) for all active resources
+    """
+    if not hasattr(current_user, "roles") or "TREAdmin" not in current_user.roles:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=strings.ACCESS_USER_DOES_NOT_HAVE_REQUIRED_ROLE)
+
+    usage = await resource_repo.get_resource_usage()
+    return usage
 
 
 @admin_router.get("/templates", name="get_all_templates", status_code=status.HTTP_200_OK)

@@ -133,17 +133,8 @@ describe('Templates Component', () => {
     window.confirm = vi.fn(() => true);
     window.alert = vi.fn();
     mockApiCall.mockImplementation((url: string) => {
-      if (url === `${ResourceType.Workspace}-templates`) {
-        return Promise.resolve({ templates: mockWorkspaceTemplates });
-      }
-      if (url === `${ResourceType.WorkspaceService}-templates`) {
-        return Promise.resolve({ templates: mockWorkspaceServiceTemplates });
-      }
-      if (url === `${ResourceType.SharedService}-templates`) {
-        return Promise.resolve({ templates: [] });
-      }
-      if (url === `${ResourceType.UserResource}-templates`) {
-        return Promise.resolve({ templates: [] });
+      if (url === 'templates') {
+        return Promise.resolve([...mockWorkspaceTemplates, ...mockWorkspaceServiceTemplates]);
       }
       if (url === 'workspaces') {
         return Promise.resolve(mockWorkspaces);
@@ -172,8 +163,7 @@ describe('Templates Component', () => {
     render(<Templates onClose={mockOnClose} />);
 
     await waitFor(() => {
-      expect(mockApiCall).toHaveBeenCalledWith(`${ResourceType.Workspace}-templates`, 'GET');
-      expect(mockApiCall).toHaveBeenCalledWith(`${ResourceType.WorkspaceService}-templates`, 'GET');
+      expect(mockApiCall).toHaveBeenCalledWith('templates', 'GET');
       expect(mockApiCall).toHaveBeenCalledWith('workspaces', 'GET');
     });
   });
@@ -186,8 +176,8 @@ describe('Templates Component', () => {
 
   it('displays "No templates found" when API returns empty array for templates', async () => {
     mockApiCall.mockImplementation((url: string) => {
-      if (url.endsWith('-templates')) {
-        return Promise.resolve({ templates: [] });
+      if (url === 'templates') {
+        return Promise.resolve([]);
       }
       if (url === 'workspaces') {
         return Promise.resolve({ workspaces: [] });
@@ -245,19 +235,49 @@ describe('Templates Component', () => {
 
 
 
+  it('displays "In Use" badge next to the specific version that is in use', async () => {
+    render(<Templates onClose={mockOnClose} />);
+    await waitFor(() => {
+      // 0.1.0 is in use
+      const versionCell = screen.getByText('0.1.0').closest('td');
+      expect(versionCell).toHaveTextContent('In Use');
+      
+      // 0.2.0 is NOT in use
+      const versionCell2 = screen.getByText('0.2.0').closest('td');
+      expect(versionCell2).not.toHaveTextContent('In Use');
+    });
+  });
+
   it('prompts with a warning when deleting a single version of an in-use template', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm');
+    render(<Templates onClose={mockOnClose} />);
+    await waitFor(() => {
+      expect(screen.getByText('0.1.0')).toBeInTheDocument();
+    });
+
+    // 0.2.0 is first (descending), 0.1.0 is second. 0.1.0 is in use.
+    const deleteButtons = screen.getAllByText('Delete Version');
+    fireEvent.click(deleteButtons[1]); // Click 0.1.0
+
+    expect(confirmSpy).toHaveBeenCalledWith(
+      'This specific version is in use by at least one workspace. Deleting it could cause issues.\n\nAre you sure you want to delete version 0.1.0 of tre-workspace-base?'
+    );
+    confirmSpy.mockRestore();
+  });
+
+  it('does not prompt with a warning when deleting an unused version of an otherwise used template', async () => {
     const confirmSpy = vi.spyOn(window, 'confirm');
     render(<Templates onClose={mockOnClose} />);
     await waitFor(() => {
       expect(screen.getByText('0.2.0')).toBeInTheDocument();
     });
 
-    // There are 3 "Delete Version" buttons, we want the first one which corresponds to the in-use template
+    // 0.2.0 is first. It is NOT in use (0.1.0 is).
     const deleteButtons = screen.getAllByText('Delete Version');
-    fireEvent.click(deleteButtons[0]);
+    fireEvent.click(deleteButtons[0]); // Click 0.2.0
 
     expect(confirmSpy).toHaveBeenCalledWith(
-      'This template is in use by at least one workspace. Deleting this version could cause issues if a workspace is using it.\n\nAre you sure you want to delete version 0.2.0 of tre-workspace-base?'
+      'Are you sure you want to delete version 0.2.0 of tre-workspace-base?'
     );
     confirmSpy.mockRestore();
   });
@@ -265,10 +285,7 @@ describe('Templates Component', () => {
   it('calls API to delete single version when confirmed', async () => {
     mockApiCall.mockImplementation((url: string, method: string) => {
       if (method === 'GET') {
-          if (url === `${ResourceType.Workspace}-templates`) return Promise.resolve({ templates: mockWorkspaceTemplates });
-          if (url === `${ResourceType.WorkspaceService}-templates`) return Promise.resolve({ templates: mockWorkspaceServiceTemplates });
-          if (url === `${ResourceType.SharedService}-templates`) return Promise.resolve({ templates: [] });
-          if (url === `${ResourceType.UserResource}-templates`) return Promise.resolve({ templates: [] });
+          if (url === 'templates') return Promise.resolve([...mockWorkspaceTemplates, ...mockWorkspaceServiceTemplates]);
           if (url === 'workspaces') return Promise.resolve(mockWorkspaces);
           if (url === 'shared-services') return Promise.resolve(mockSharedServices);
       }
@@ -296,10 +313,7 @@ describe('Templates Component', () => {
   it('calls API to delete all versions when confirmed for a non-in-use template', async () => {
     mockApiCall.mockImplementation((url: string, method: string) => {
         if (method === 'GET') {
-            if (url === `${ResourceType.Workspace}-templates`) return Promise.resolve({ templates: mockWorkspaceTemplates });
-            if (url === `${ResourceType.WorkspaceService}-templates`) return Promise.resolve({ templates: mockWorkspaceServiceTemplates });
-            if (url === `${ResourceType.SharedService}-templates`) return Promise.resolve({ templates: [] });
-            if (url === `${ResourceType.UserResource}-templates`) return Promise.resolve({ templates: [] });
+            if (url === 'templates') return Promise.resolve([...mockWorkspaceTemplates, ...mockWorkspaceServiceTemplates]);
             if (url === 'workspaces') return Promise.resolve(mockWorkspaces);
             if (url === 'shared-services') return Promise.resolve(mockSharedServices);
         }

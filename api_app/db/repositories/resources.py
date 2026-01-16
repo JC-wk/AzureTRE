@@ -59,6 +59,14 @@ class ResourceRepository(BaseRepository):
     def get_resource_base_spec_params():
         return {"tre_id": config.TRE_ID}
 
+    async def get_resource_usage(self) -> List[dict]:
+        query = "SELECT c.templateName, c.templateVersion, c.id, c.resourceType, c.properties.display_name as displayName FROM c WHERE c.deploymentStatus != @deletedStatus"
+        parameters = [
+            {'name': '@deletedStatus', 'value': Status.Deleted}
+        ]
+        items = await self.query(query=query, parameters=parameters)
+        return items
+
     async def get_resource_dict_by_id(self, resource_id: UUID4) -> dict:
         try:
             resource = await self.read_item_by_id(str(resource_id))

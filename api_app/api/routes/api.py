@@ -8,7 +8,7 @@ from fastapi.openapi.utils import get_openapi
 from api.helpers import get_repository
 from db.repositories.workspaces import WorkspaceRepository
 from api.routes import health, ping, workspaces, workspace_templates, workspace_service_templates, user_resource_templates, \
-    shared_services, shared_service_templates, migrations, costs, airlock, operations, metadata, requests, workspace_users
+    shared_services, shared_service_templates, migrations, costs, airlock, operations, metadata, requests, workspace_users, admin
 from core import config
 from resources import strings
 
@@ -18,6 +18,7 @@ core_tags_metadata = [
     {"name": "workspace service templates", "description": "**TRE admin** registers templates and can access templates"},
     {"name": "user resource templates", "description": "**TRE admin** registers templates and can access templates"},
     {"name": "workspaces", "description": "**TRE admin** administers workspaces, **TRE Users** can view their own workspaces"},
+    {"name": "admin", "description": "**TRE admin** can perform administrative tasks"},
 ]
 
 workspace_tags_metadata = [
@@ -51,6 +52,7 @@ core_router.include_router(costs.costs_core_router, tags=["costs"])
 core_router.include_router(costs.costs_workspace_router, tags=["costs"])
 core_router.include_router(requests.router, tags=["requests"])
 core_router.include_router(workspace_users.workspaces_users_shared_router, tags=["users"])
+core_router.include_router(admin.admin_router, tags=["admin"])
 
 if config.USER_MANAGEMENT_ENABLED:
     core_router.include_router(workspace_users.workspaces_users_admin_router, tags=["users"])

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Stack, DefaultButton, PrimaryButton, Spinner } from '@fluentui/react';
+import { Stack, DefaultButton, PrimaryButton, Spinner, TooltipHost, DirectionalHint } from '@fluentui/react';
 import { useAuthApiCall, HttpMethod, ResultType } from '../../../hooks/useAuthApiCall';
 import semver from 'semver';
 import { Workspace } from '../../../models/workspace';
@@ -16,59 +16,55 @@ interface Template {
   current: boolean;
 }
 
+interface TemplateUsage {
+  id: string;
+  displayName?: string;
+  resourceType: string;
+  templateName: string;
+  templateVersion: string;
+}
+
 interface TemplatesProps {
   onClose: () => void;
 }
 
 const Templates: React.FC<TemplatesProps> = ({ onClose }) => {
   const [templates, setTemplates] = useState<Template[]>([]);
-  const [inUseTemplates, setInUseTemplates] = useState<Set<string>>(new Set());
+  const [inUseTemplates, setInUseTemplates] = useState<Map<string, TemplateUsage[]>>(new Map());
   const [loading, setLoading] = useState(false);
   const api = useAuthApiCall();
+
+  const getTemplateVersionKey = (name: string, version: string) => `${name}::${version}`;
 
   const fetchTemplatesAndWorkspaces = async () => {
     setLoading(true);
     try {
       const [
-        workspaceTemplates,
-        workspaceServiceTemplates,
-        sharedServiceTemplates,
-        userResourceTemplates,
-        workspaces,
-        sharedServices
+        allTemplates,
+        templateUsage
       ] = await Promise.all([
-        api(`${ResourceType.Workspace}-templates`, HttpMethod.Get),
-        api(`${ResourceType.WorkspaceService}-templates`, HttpMethod.Get),
-        api(`${ResourceType.SharedService}-templates`, HttpMethod.Get),
-        api(`${ResourceType.UserResource}-templates`, HttpMethod.Get),
-        api('workspaces', HttpMethod.Get),
-        api('shared-services', HttpMethod.Get)
+        api('templates', HttpMethod.Get),
+        api('templates/usage', HttpMethod.Get)
       ]);
 
-      const allTemplates = [
-        ...(workspaceTemplates.templates || []),
-        ...(workspaceServiceTemplates.templates || []),
-        ...(sharedServiceTemplates.templates || []),
-        ...(userResourceTemplates.templates || [])
-      ];
+      setTemplates(allTemplates || []);
 
-      setTemplates(allTemplates);
-
-      const usedTemplates = new Set<string>();
-      if (workspaces && workspaces.workspaces) {
-        workspaces.workspaces.forEach((w: Workspace) => {
-          if (w.templateName) usedTemplates.add(w.templateName);
+      const usageMap = new Map<string, TemplateUsage[]>();
+      if (templateUsage && Array.isArray(templateUsage)) {
+        templateUsage.forEach((u: TemplateUsage) => {
+          if (u.templateName && u.templateVersion) {
+            const key = getTemplateVersionKey(u.templateName, u.templateVersion);
+            if (!usageMap.has(key)) {
+              usageMap.set(key, []);
+            }
+            usageMap.get(key)?.push(u);
+          }
         });
       }
-      if (sharedServices && sharedServices.sharedServices) {
-        sharedServices.sharedServices.forEach((s: SharedService) => {
-          if (s.templateName) usedTemplates.add(s.templateName);
-        });
-      }
-      setInUseTemplates(usedTemplates);
+      setInUseTemplates(usageMap);
 
     } catch (e) {
-      console.error("Error fetching templates or workspaces", e);
+      console.error("Error fetching templates or usage", e);
     } finally {
       setLoading(false);
     }
@@ -79,11 +75,7 @@ const Templates: React.FC<TemplatesProps> = ({ onClose }) => {
   }, []);
 
   const handleDeleteVersion = async (templateId: string, templateName: string, version: string) => {
-    let warning = '';
-    if (inUseTemplates.has(templateName)) {
-      warning = 'This template is in use by at least one workspace. Deleting this version could cause issues if a workspace is using it.\n\n';
-    }
-    if (!window.confirm(`${warning}Are you sure you want to delete version ${version} of ${templateName}?`)) return;
+    if (!window.confirm(`Are you sure you want to delete version ${version} of ${templateName}?`)) return;
 
     try {
       await api(`/templates/${templateId}`, HttpMethod.Delete, undefined, undefined, ResultType.None);
@@ -94,12 +86,14 @@ const Templates: React.FC<TemplatesProps> = ({ onClose }) => {
     }
   };
 
-  const handleDeleteAllVersions = async (templateName: string, resourceType: string) => {
-    if (inUseTemplates.has(templateName)) {
-      alert(`Unable to delete ${templateName} as it is currently in use by one or more workspaces.`);
+  const handleDeleteAllVersions = async (templateName: string, resourceType: string, versions: Template[]) => {
+    const isAnyVersionInUse = versions.some(v => inUseTemplates.has(getTemplateVersionKey(templateName, v.version)));
+    
+    if (isAnyVersionInUse) {
+      alert(`Unable to delete ${templateName} as one or more versions are currently in use.`);
       return;
     }
-    const versionsCount = templates.filter(t => t.name === templateName && t.resourceType === resourceType).length;
+    const versionsCount = versions.length;
     if (!window.confirm(
       `Are you sure you want to delete ALL ${versionsCount} version(s) of ${templateName} (${resourceType})?`
     )) return;
@@ -144,14 +138,15 @@ const Templates: React.FC<TemplatesProps> = ({ onClose }) => {
         <div style={{ overflowX: 'auto', marginTop: 10 }}>
           {Object.entries(groupedTemplates).map(([key, templateVersions]) => {
             const firstTemplate = templateVersions[0];
-            const isInUse = inUseTemplates.has(firstTemplate.name);
+            const isAnyVersionInUse = templateVersions.some(v => inUseTemplates.has(getTemplateVersionKey(v.name, v.version)));
+            
             return (
               <div key={key} style={{ marginBottom: 30 }}>
                 <Stack horizontal horizontalAlign="space-between" verticalAlign="center" style={{ marginBottom: 10 }}>
                   <div>
                     <h3 style={{ margin: 0, display: 'flex', alignItems: 'center' }}>
                       {firstTemplate.title || firstTemplate.name}
-                      {isInUse && (
+                      {isAnyVersionInUse && (
                         <span style={{
                           backgroundColor: '#edebe9',
                           borderRadius: '4px',
@@ -175,9 +170,9 @@ const Templates: React.FC<TemplatesProps> = ({ onClose }) => {
                   </div>
                   <PrimaryButton
                     text={`Delete All ${templateVersions.length} Version(s)`}
-                    onClick={() => handleDeleteAllVersions(firstTemplate.name, firstTemplate.resourceType)}
-                    styles={{ root: { backgroundColor: isInUse ? '#b3b3b3' : '#a4262c' } }}
-                    disabled={isInUse}
+                    onClick={() => handleDeleteAllVersions(firstTemplate.name, firstTemplate.resourceType, templateVersions)}
+                    styles={{ root: { backgroundColor: isAnyVersionInUse ? '#b3b3b3' : '#a4262c' } }}
+                    disabled={isAnyVersionInUse}
                     data-testid={`delete-all-${firstTemplate.name}`}
                   />
                 </Stack>
@@ -194,10 +189,40 @@ const Templates: React.FC<TemplatesProps> = ({ onClose }) => {
                   <tbody>
                     {templateVersions
                       .sort((a, b) => semver.rcompare(a.version, b.version))
-                      .map((template) => (
+                      .map((template) => {
+                        const usage = inUseTemplates.get(getTemplateVersionKey(template.name, template.version));
+                        const isVersionInUse = usage && usage.length > 0;
+                        return (
                         <tr key={template.id}>
                           <td>
                             <strong>{template.version}</strong>
+                            {isVersionInUse && (
+                              <TooltipHost
+                                content={
+                                  <ul style={{ margin: 0, paddingInlineStart: '20px' }}>
+                                    {usage!.map((u: TemplateUsage) => (
+                                      <li key={u.id}>
+                                        {u.displayName || u.id} ({u.resourceType})
+                                      </li>
+                                    ))}
+                                  </ul>
+                                }
+                                directionalHint={DirectionalHint.rightCenter}
+                              >
+                                <span style={{
+                                  backgroundColor: '#edebe9',
+                                  borderRadius: '4px',
+                                  padding: '2px 6px',
+                                  fontSize: '10px',
+                                  fontWeight: '600',
+                                  marginLeft: '8px',
+                                  verticalAlign: 'middle',
+                                  cursor: 'help'
+                                }}>
+                                  In Use
+                                </span>
+                              </TooltipHost>
+                            )}
                           </td>
                           <td>
                             {template.current ? (
@@ -216,7 +241,7 @@ const Templates: React.FC<TemplatesProps> = ({ onClose }) => {
                             />
                           </td>
                         </tr>
-                      ))}
+                      )})}
                   </tbody>
                 </table>
               </div>
