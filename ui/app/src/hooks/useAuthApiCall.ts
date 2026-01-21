@@ -24,10 +24,10 @@ export const useAuthApiCall = () => {
   const { instance, accounts } = useMsal();
   const account = useAccount(accounts[0] || {});
 
-  const parseJwt = (token: string) => {
-    var base64Url = token.split(".")[1];
-    var base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-    var jsonPayload = decodeURIComponent(
+  const parseJwt = (token: string): { roles: Array<string> } => {
+    const base64Url = token.split(".")[1];
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+    const jsonPayload = decodeURIComponent(
       atob(base64)
         .split("")
         .map(function (c) {
@@ -36,7 +36,7 @@ export const useAuthApiCall = () => {
         .join(""),
     );
 
-    return JSON.parse(jsonPayload);
+    return JSON.parse(jsonPayload) as { roles: Array<string> };
   };
 
   return useCallback(
@@ -44,13 +44,13 @@ export const useAuthApiCall = () => {
       endpoint: string,
       method: HttpMethod,
       workspaceApplicationIdURI?: string,
-      body?: any,
+      body?: unknown,
       resultType?: ResultType,
       setRoles?: (roles: Array<string>) => void,
       tokenOnly?: boolean,
       etag?: string,
     ) => {
-      config.debug &&
+      if (config.debug)
         console.log("API call", {
           endpoint: endpoint,
           method: method,
@@ -69,7 +69,7 @@ export const useAuthApiCall = () => {
       const applicationIdURI =
         workspaceApplicationIdURI || config.treApplicationId;
       let tokenResponse = {} as AuthenticationResult;
-      let tokenRequest = {
+      const tokenRequest = {
         scopes: [`${applicationIdURI}/user_impersonation`],
         account: account,
       };
@@ -84,7 +84,7 @@ export const useAuthApiCall = () => {
         }
       }
 
-      config.debug && console.log("Token Response", tokenResponse);
+      if (config.debug) console.log("Token Response", tokenResponse);
 
       if (!tokenResponse) {
         console.error("Token could not be retrieved, please refresh.");
@@ -93,8 +93,8 @@ export const useAuthApiCall = () => {
 
       // caller can pass a function to allow us to set the roles to use for RBAC
       if (setRoles) {
-        let decodedToken = parseJwt(tokenResponse.accessToken);
-        config.debug && console.log("Decoded token", decodedToken);
+        const decodedToken = parseJwt(tokenResponse.accessToken);
+        if (config.debug) console.log("Decoded token", decodedToken);
         setRoles(decodedToken.roles);
       }
 
@@ -106,7 +106,7 @@ export const useAuthApiCall = () => {
 
       // default to JSON unless otherwise told
       resultType = resultType || ResultType.JSON;
-      config.debug &&
+      if (config.debug)
         console.log(`Calling ${method} on authenticated api: ${endpoint}`);
 
       // set the headers for auth + http method
@@ -126,8 +126,8 @@ export const useAuthApiCall = () => {
       let resp;
       try {
         resp = await fetch(`${config.treUrl}/${endpoint}`, opts);
-      } catch (err: any) {
-        let e = err as APIError;
+      } catch (err: unknown) {
+        const e = err as APIError;
         e.name = "API call failure";
         e.message = "Unable to make call to API Backend";
         e.endpoint = `${config.treUrl}/${endpoint}`;
@@ -135,7 +135,7 @@ export const useAuthApiCall = () => {
       }
 
       if (!resp.ok) {
-        let e = new APIError();
+        const e = new APIError();
         e.message = await resp.text();
         e.status = resp.status;
         e.endpoint = endpoint;
@@ -144,19 +144,21 @@ export const useAuthApiCall = () => {
 
       try {
         switch (resultType) {
-          case ResultType.Text:
-            let text = await resp.text();
-            config.debug && console.log(text);
+          case ResultType.Text: {
+            const text = await resp.text();
+            if (config.debug) console.log(text);
             return text;
-          case ResultType.JSON:
-            let json = await resp.json();
-            config.debug && console.log(json);
+          }
+          case ResultType.JSON: {
+            const json = await resp.json();
+            if (config.debug) console.log(json);
             return json;
+          }
           case ResultType.None:
             return;
         }
-      } catch (err: any) {
-        let e = err as APIError;
+      } catch (err: unknown) {
+        const e = err as APIError;
         e.name = "Error with response data";
         throw e;
       }

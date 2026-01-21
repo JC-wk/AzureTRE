@@ -2,6 +2,7 @@ import { renderHook } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
 import { useAuthApiCall, HttpMethod, ResultType } from './useAuthApiCall';
 import { useMsal, useAccount } from '@azure/msal-react';
+import { InteractionRequiredAuthError } from '@azure/msal-browser';
 
 // Mock MSAL hooks
 vi.mock('@azure/msal-react', () => ({
@@ -205,7 +206,6 @@ describe('useAuthApiCall Hook', () => {
 
   it('falls back to popup when silent token acquisition fails', async () => {
     // Create a proper InteractionRequiredAuthError using the mocked class
-    const { InteractionRequiredAuthError } = await import('@azure/msal-browser') as any;
     const interactionError = new InteractionRequiredAuthError('interaction_required', 'InteractionRequiredAuthError');
 
     mockInstance.acquireTokenSilent.mockRejectedValue(interactionError);
