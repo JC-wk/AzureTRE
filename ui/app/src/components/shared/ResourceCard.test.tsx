@@ -247,8 +247,6 @@ const renderWithContexts = (
   appRolesContext = mockAppRolesContext
 ) => {
   return render(component, {
-    // Use spread operator to include children property which is required by AllProvidersProps
-    children: component,
     workspaceContext,
     appRolesContext
   });

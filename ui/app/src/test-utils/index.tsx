@@ -137,7 +137,7 @@ const AllProviders: React.FC<AllProvidersProps> = ({
 
 const customRender = (
   ui: ReactElement,
-  options?: Omit<RenderOptions, 'wrapper'> & AllProvidersProps
+  options?: Omit<RenderOptions, 'wrapper'> & Omit<AllProvidersProps, 'children'>
 ) => {
   const {
     msalInstance,
