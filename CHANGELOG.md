@@ -13,7 +13,7 @@ BUG FIXES:
 * Fix Mysql template ignored storage_mb ([#4846](https://github.com/microsoft/AzureTRE/issues/4846))
 * Fix duplicate `TOPIC_SUBSCRIPTION_NAME` in `core/terraform/airlock/airlock_processor.tf` ([#4847](https://github.com/microsoft/AzureTRE/pull/4847))
 * Fix Nexus repository access blocked by unaccepted EULA in Nexus 3.77+ Community Edition ([#4842](https://github.com/microsoft/AzureTRE/issues/4842))
-* Increase terraform timeouts on firewall and bastion to 60 mins.
+* Increase terraform timeouts on firewall, app gateway and bastion to 60 mins
 
 ## 0.27.0 (February 5, 2026)
 **BREAKING CHANGES**
