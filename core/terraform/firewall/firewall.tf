@@ -52,7 +52,6 @@ resource "azurerm_firewall" "fw" {
 
   timeouts {
     create = "60m"
-    update = "60m"
     delete = "60m"
   }
 

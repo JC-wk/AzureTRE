@@ -27,7 +27,6 @@ resource "azurerm_bastion_host" "bastion" {
 
   timeouts {
     create = "60m"
-    update = "60m"
     delete = "60m"
   }
 
