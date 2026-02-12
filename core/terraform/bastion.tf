@@ -25,5 +25,11 @@ resource "azurerm_bastion_host" "bastion" {
 
   tags = local.tre_core_tags
 
+  timeouts {
+    create = "60m"
+    update = "60m"
+    delete = "60m"
+  }
+
   lifecycle { ignore_changes = [tags] }
 }
