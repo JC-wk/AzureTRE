@@ -9,7 +9,7 @@ import json
 
 from exceptions import NoFilesInRequestException, TooManyFilesInRequestException
 
-from shared_code import blob_operations, constants
+from shared_code import blob_operations, constants, sb_helpers
 from pydantic import BaseModel, parse_obj_as
 
 
@@ -30,21 +30,21 @@ class ContainersCopyMetadata:
         self.dest_account_name = dest_account_name
 
 
-def main(msg: func.ServiceBusMessage, stepResultEvent: func.Out[func.EventGridOutputEvent], dataDeletionEvent: func.Out[func.EventGridOutputEvent]):
+async def main(msg: func.ServiceBusMessage, stepResultEvent: func.Out[func.EventGridOutputEvent], dataDeletionEvent: func.Out[func.EventGridOutputEvent]):
     try:
-        request_properties = extract_properties(msg)
+        request_properties = await extract_properties(msg)
         request_files = get_request_files(request_properties) if request_properties.new_status == constants.STAGE_SUBMITTED else None
-        handle_status_changed(request_properties, stepResultEvent, dataDeletionEvent, request_files)
+        await handle_status_changed(request_properties, stepResultEvent, dataDeletionEvent, request_files)
 
     except NoFilesInRequestException:
-        set_output_event_to_report_failure(stepResultEvent, request_properties, failure_reason=constants.NO_FILES_IN_REQUEST_MESSAGE, request_files=request_files)
+        await set_output_event_to_report_failure(stepResultEvent, request_properties, failure_reason=constants.NO_FILES_IN_REQUEST_MESSAGE, request_files=request_files)
     except TooManyFilesInRequestException:
-        set_output_event_to_report_failure(stepResultEvent, request_properties, failure_reason=constants.TOO_MANY_FILES_IN_REQUEST_MESSAGE, request_files=request_files)
+        await set_output_event_to_report_failure(stepResultEvent, request_properties, failure_reason=constants.TOO_MANY_FILES_IN_REQUEST_MESSAGE, request_files=request_files)
     except Exception:
-        set_output_event_to_report_failure(stepResultEvent, request_properties, failure_reason=constants.UNKNOWN_REASON_MESSAGE, request_files=request_files)
+        await set_output_event_to_report_failure(stepResultEvent, request_properties, failure_reason=constants.UNKNOWN_REASON_MESSAGE, request_files=request_files)
 
 
-def handle_status_changed(request_properties: RequestProperties, stepResultEvent: func.Out[func.EventGridOutputEvent], dataDeletionEvent: func.Out[func.EventGridOutputEvent], request_files):
+async def handle_status_changed(request_properties: RequestProperties, stepResultEvent: func.Out[func.EventGridOutputEvent], dataDeletionEvent: func.Out[func.EventGridOutputEvent], request_files):
     new_status = request_properties.new_status
     previous_status = request_properties.previous_status
     req_id = request_properties.request_id
@@ -61,11 +61,11 @@ def handle_status_changed(request_properties: RequestProperties, stepResultEvent
     if new_status == constants.STAGE_CANCELLED:
         storage_account_name = get_storage_account(previous_status, request_type, ws_id)
         container_to_delete_url = blob_operations.get_blob_url(account_name=storage_account_name, container_name=req_id)
-        set_output_event_to_trigger_container_deletion(dataDeletionEvent, request_properties, container_url=container_to_delete_url)
+        await set_output_event_to_trigger_container_deletion(dataDeletionEvent, request_properties, container_url=container_to_delete_url)
         return
 
     if new_status == constants.STAGE_SUBMITTED:
-        set_output_event_to_report_request_files(stepResultEvent, request_properties, request_files)
+        await set_output_event_to_report_request_files(stepResultEvent, request_properties, request_files)
 
     if (is_require_data_copy(new_status)):
         logging.info('Request with id %s. requires data copy between storage accounts', req_id)
@@ -78,11 +78,12 @@ def handle_status_changed(request_properties: RequestProperties, stepResultEvent
     # Other statuses which do not require data copy are dismissed as we don't need to do anything...
 
 
-def extract_properties(msg: func.ServiceBusMessage) -> RequestProperties:
+async def extract_properties(msg: func.ServiceBusMessage) -> RequestProperties:
     try:
         body = msg.get_body().decode('utf-8')
-        logging.debug('Python ServiceBus queue trigger processed message: %s', body)
-        json_body = json.loads(body)
+        logging.debug('Python ServiceBus queue trigger raw body: %s', body)
+        payload = await sb_helpers.receive_message_payload(body)
+        json_body = json.loads(payload)
         result = parse_obj_as(RequestProperties, json_body["data"])
         if not result:
             raise Exception("Failed parsing request properties")
@@ -179,36 +180,42 @@ def get_storage_account_destination_for_copy(new_status: str, request_type: str,
     raise Exception(error_message)
 
 
-def set_output_event_to_report_failure(stepResultEvent, request_properties, failure_reason, request_files):
+async def set_output_event_to_report_failure(stepResultEvent, request_properties, failure_reason, request_files):
     logging.exception(f"Failed processing Airlock request with ID: '{request_properties.request_id}', changing request status to '{constants.STAGE_FAILED}'.")
+    data = {"completed_step": request_properties.new_status, "new_status": constants.STAGE_FAILED, "request_id": request_properties.request_id, "request_files": request_files, "status_message": failure_reason}
+    offloaded_data = await sb_helpers.wrap_payload_for_offloading(data)
     stepResultEvent.set(
         func.EventGridOutputEvent(
             id=str(uuid.uuid4()),
-            data={"completed_step": request_properties.new_status, "new_status": constants.STAGE_FAILED, "request_id": request_properties.request_id, "request_files": request_files, "status_message": failure_reason},
+            data=offloaded_data,
             subject=request_properties.request_id,
             event_type="Airlock.StepResult",
             event_time=datetime.datetime.now(datetime.UTC),
             data_version=constants.STEP_RESULT_EVENT_DATA_VERSION))
 
 
-def set_output_event_to_report_request_files(stepResultEvent, request_properties, request_files):
+async def set_output_event_to_report_request_files(stepResultEvent, request_properties, request_files):
     logging.info(f'Sending file enumeration result for request with ID: {request_properties.request_id} result: {request_files}')
+    data = {"completed_step": request_properties.new_status, "request_id": request_properties.request_id, "request_files": request_files}
+    offloaded_data = await sb_helpers.wrap_payload_for_offloading(data)
     stepResultEvent.set(
         func.EventGridOutputEvent(
             id=str(uuid.uuid4()),
-            data={"completed_step": request_properties.new_status, "request_id": request_properties.request_id, "request_files": request_files},
+            data=offloaded_data,
             subject=request_properties.request_id,
             event_type="Airlock.StepResult",
             event_time=datetime.datetime.now(datetime.UTC),
             data_version=constants.STEP_RESULT_EVENT_DATA_VERSION))
 
 
-def set_output_event_to_trigger_container_deletion(dataDeletionEvent, request_properties, container_url):
+async def set_output_event_to_trigger_container_deletion(dataDeletionEvent, request_properties, container_url):
     logging.info(f'Sending container deletion event for request ID: {request_properties.request_id}. container URL: {container_url}')
+    data = {"blob_to_delete": container_url}
+    offloaded_data = await sb_helpers.wrap_payload_for_offloading(data)
     dataDeletionEvent.set(
         func.EventGridOutputEvent(
             id=str(uuid.uuid4()),
-            data={"blob_to_delete": container_url},
+            data=offloaded_data,
             subject=request_properties.request_id,
             event_type="Airlock.DataDeletion",
             event_time=datetime.datetime.now(datetime.UTC),

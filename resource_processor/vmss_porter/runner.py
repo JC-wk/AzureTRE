@@ -7,6 +7,7 @@ import sys
 from helpers.commands import azure_acr_login_command, azure_login_command, build_porter_command, build_porter_command_for_outputs, apply_porter_credentials_sets_command, run_command_helper
 from shared.config import get_config
 from helpers.httpserver import start_server
+from shared import sb_helpers
 
 from shared.logging import initialize_logging, logger, tracer
 from shared.config import VERSION
@@ -70,7 +71,8 @@ async def receive_message(service_bus_client, config: dict, keep_running=lambda:
                         message = ""
 
                         try:
-                            message = json.loads(str(msg))
+                            payload = await sb_helpers.receive_message_payload(msg, config)
+                            message = json.loads(payload)
                         except (json.JSONDecodeError) as e:
                             logger.error(f"Received bad service bus resource request message: {e}")
 
@@ -173,7 +175,7 @@ async def invoke_porter_action(msg_body: dict, sb_client: ServiceBusClient, conf
 
     # post an update message to set the status to an 'in progress' one
     resource_request_message = service_bus_message_generator(msg_body, statuses.in_progress_status_string_for[action], "Job starting")
-    await sb_sender.send_messages(ServiceBusMessage(body=resource_request_message, correlation_id=msg_body["id"], session_id=msg_body["operationId"]))
+    await sb_helpers.send_message(ServiceBusMessage(body=resource_request_message, correlation_id=msg_body["id"], session_id=msg_body["operationId"]), config["deployment_status_queue"], config)
     logger.info(f'Sent status message for {installation_id} - {statuses.in_progress_status_string_for[action]} - Job starting')
 
     # Build and run porter command (flagging if its a built-in action or custom so we can adapt porter command appropriately)
@@ -237,7 +239,7 @@ async def invoke_porter_action(msg_body: dict, sb_client: ServiceBusClient, conf
 
         resource_request_message = service_bus_message_generator(msg_body, status_for_sb_message, status_message, outputs)
 
-    await sb_sender.send_messages(ServiceBusMessage(body=resource_request_message, correlation_id=msg_body["id"], session_id=msg_body["operationId"]))
+    await sb_helpers.send_message(ServiceBusMessage(body=resource_request_message, correlation_id=msg_body["id"], session_id=msg_body["operationId"]), config["deployment_status_queue"], config)
     logger.info(f"Sent status message for {installation_id}: {status_for_sb_message}")
 
     # return true as want to continue processing the message

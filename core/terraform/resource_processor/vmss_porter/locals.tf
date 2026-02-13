@@ -47,6 +47,8 @@ locals {
     aad_authority_url                                = module.terraform_azurerm_environment_configuration.active_directory_endpoint
     microsoft_graph_fqdn                             = regex("(?:(?P<scheme>[^:/?#]+):)?(?://(?P<fqdn>[^/?#:]*))?", module.terraform_azurerm_environment_configuration.microsoft_graph_endpoint).fqdn
     logging_level                                    = var.logging_level
+    service_bus_messages_storage_account_name        = var.service_bus_messages_storage_account_name
+    storage_endpoint_suffix                          = var.storage_endpoint_suffix
     rp_bundle_values                                 = local.rp_bundle_values_formatted
   })
 }

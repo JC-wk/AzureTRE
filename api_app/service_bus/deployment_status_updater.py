@@ -10,7 +10,7 @@ from models.domain.resource import Output
 from db.repositories.resources_history import ResourceHistoryRepository
 from models.domain.request_action import RequestAction
 from db.repositories.resource_templates import ResourceTemplateRepository
-from service_bus.helpers import send_deployment_message, update_resource_for_step
+from service_bus.helpers import send_deployment_message, update_resource_for_step, receive_message_payload
 from azure.servicebus import NEXT_AVAILABLE_SESSION
 from azure.servicebus.exceptions import OperationTimeoutError, ServiceBusConnectionError
 from azure.servicebus.aio import ServiceBusClient, AutoLockRenewer
@@ -87,7 +87,8 @@ class DeploymentStatusUpdater():
 
         with tracer.start_as_current_span("process_message") as current_span:
             try:
-                message = parse_obj_as(DeploymentStatusUpdateMessage, json.loads(str(msg)))
+                payload = await receive_message_payload(msg)
+                message = parse_obj_as(DeploymentStatusUpdateMessage, json.loads(payload))
 
                 current_span.set_attribute("step_id", message.stepId)
                 current_span.set_attribute("operation_id", message.operationId)

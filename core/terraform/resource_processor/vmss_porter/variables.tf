@@ -124,3 +124,13 @@ variable "firewall_policy_id" {
   type        = string
   description = "ID of the firewall policy to use for the resource processor"
 }
+
+variable "service_bus_messages_storage_account_name" {
+  type        = string
+  description = "Name of the storage account for Service Bus messages offloading"
+}
+
+variable "storage_endpoint_suffix" {
+  type        = string
+  description = "Storage endpoint suffix"
+}

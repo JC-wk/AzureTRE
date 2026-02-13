@@ -1,5 +1,8 @@
+import json
+import uuid
 from azure.servicebus import ServiceBusMessage
 from azure.servicebus.aio import ServiceBusClient
+from azure.storage.blob.aio import BlobServiceClient
 from pydantic import parse_obj_as
 from resources import strings
 from db.repositories.resources_history import ResourceHistoryRepository
@@ -25,6 +28,23 @@ async def _send_message(message: ServiceBusMessage, queue: str):
     :param queue: The Service Bus queue to send the message to.
     :type queue: str
     """
+    # Claim check pattern
+    if config.SERVICE_BUS_MESSAGES_STORAGE_ACCOUNT_NAME:
+        body_str = str(message)
+        if len(body_str) > config.SERVICE_BUS_MESSAGE_OFFLOAD_THRESHOLD:
+            logger.info(f"Message size {len(body_str)} exceeds threshold {config.SERVICE_BUS_MESSAGE_OFFLOAD_THRESHOLD}. Offloading to blob storage.")
+            blob_url = await _offload_to_blob(body_str)
+            offload_message = {
+                "claim_check": blob_url
+            }
+            # We must recreate the ServiceBusMessage because body is read-only
+            message = ServiceBusMessage(
+                body=json.dumps(offload_message),
+                correlation_id=message.correlation_id,
+                session_id=message.session_id,
+                application_properties=message.application_properties
+            )
+
     async with credentials.get_credential_async_context() as credential:
         service_bus_client = ServiceBusClient(config.SERVICE_BUS_FULLY_QUALIFIED_NAMESPACE, credential)
 
@@ -33,6 +53,43 @@ async def _send_message(message: ServiceBusMessage, queue: str):
 
             async with sender:
                 await sender.send_messages(message)
+
+
+async def _offload_to_blob(content: str) -> str:
+    account_url = f"https://{config.SERVICE_BUS_MESSAGES_STORAGE_ACCOUNT_NAME}.blob.{config.STORAGE_ENDPOINT_SUFFIX}"
+    async with credentials.get_credential_async_context() as credential:
+        blob_service_client = BlobServiceClient(account_url, credential=credential)
+        async with blob_service_client:
+            blob_name = f"msg-{uuid.uuid4()}.json"
+            blob_client = blob_service_client.get_blob_client(container="sb-messages", blob=blob_name)
+            await blob_client.upload_blob(content)
+            return f"sb-messages/{blob_name}"
+
+
+async def receive_message_payload(msg: ServiceBusMessage) -> str:
+    body_str = str(msg)
+    try:
+        body_json = json.loads(body_str)
+        if "claim_check" in body_json:
+            blob_path = body_json["claim_check"]
+            logger.info(f"Message has claim check: {blob_path}. Downloading from blob storage.")
+            return await _download_from_blob(blob_path)
+    except json.JSONDecodeError:
+        pass
+
+    return body_str
+
+
+async def _download_from_blob(blob_path: str) -> str:
+    account_url = f"https://{config.SERVICE_BUS_MESSAGES_STORAGE_ACCOUNT_NAME}.blob.{config.STORAGE_ENDPOINT_SUFFIX}"
+    container_name, blob_name = blob_path.split("/", 1)
+    async with credentials.get_credential_async_context() as credential:
+        blob_service_client = BlobServiceClient(account_url, credential=credential)
+        async with blob_service_client:
+            blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
+            download_stream = await blob_client.download_blob()
+            content = await download_stream.readall()
+            return content.decode("utf-8")
 
 
 async def send_deployment_message(content, correlation_id, session_id, action):

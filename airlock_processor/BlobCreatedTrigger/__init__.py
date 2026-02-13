@@ -7,21 +7,25 @@ import os
 
 import azure.functions as func
 
-from shared_code import constants, parsers
+from shared_code import constants, parsers, sb_helpers
 from shared_code.blob_operations import get_blob_info_from_topic_and_subject, get_blob_client_from_blob_info
 
 
-def main(msg: func.ServiceBusMessage,
+async def main(msg: func.ServiceBusMessage,
          stepResultEvent: func.Out[func.EventGridOutputEvent],
          dataDeletionEvent: func.Out[func.EventGridOutputEvent]):
 
     logging.info("Python ServiceBus topic trigger processed message - A new blob was created!.")
     body = msg.get_body().decode('utf-8')
-    logging.info('Python ServiceBus queue trigger processed message: %s', body)
+    logging.info('Python ServiceBus topic trigger raw body: %s', body)
+    payload = await sb_helpers.receive_message_payload(body)
+    json_body = json.loads(payload)
 
-    json_body = json.loads(body)
     topic = json_body["topic"]
     request_id = re.search(r'/blobServices/default/containers/(.*?)/blobs', json_body["subject"]).group(1)
+
+    completed_step = None
+    new_status = None
 
     # message originated from in-progress blob creation
     if constants.STORAGE_ACCOUNT_NAME_IMPORT_INPROGRESS in topic or constants.STORAGE_ACCOUNT_NAME_EXPORT_INPROGRESS in topic:
@@ -35,7 +39,7 @@ def main(msg: func.ServiceBusMessage,
             # If malware scanning is enabled, the fact that the blob was created can be dismissed.
             # It will be consumed by the malware scanning service
             logging.info('Malware scanning is enabled. no action to perform.')
-            send_delete_event(dataDeletionEvent, json_body, request_id)
+            await send_delete_event(dataDeletionEvent, json_body, request_id)
             return
         else:
             logging.info('Malware scanning is disabled. Completing the submitted stage (moving to in_review).')
@@ -57,19 +61,22 @@ def main(msg: func.ServiceBusMessage,
         new_status = constants.STAGE_BLOCKED_BY_SCAN
 
     # reply with a step completed event
-    stepResultEvent.set(
-        func.EventGridOutputEvent(
-            id=str(uuid.uuid4()),
-            data={"completed_step": completed_step, "new_status": new_status, "request_id": request_id},
-            subject=request_id,
-            event_type="Airlock.StepResult",
-            event_time=datetime.datetime.now(datetime.UTC),
-            data_version=constants.STEP_RESULT_EVENT_DATA_VERSION))
+    if completed_step and new_status:
+        data = {"completed_step": completed_step, "new_status": new_status, "request_id": request_id}
+        offloaded_data = await sb_helpers.wrap_payload_for_offloading(data)
+        stepResultEvent.set(
+            func.EventGridOutputEvent(
+                id=str(uuid.uuid4()),
+                data=offloaded_data,
+                subject=request_id,
+                event_type="Airlock.StepResult",
+                event_time=datetime.datetime.now(datetime.UTC),
+                data_version=constants.STEP_RESULT_EVENT_DATA_VERSION))
 
-    send_delete_event(dataDeletionEvent, json_body, request_id)
+    await send_delete_event(dataDeletionEvent, json_body, request_id)
 
 
-def send_delete_event(dataDeletionEvent: func.Out[func.EventGridOutputEvent], json_body, request_id):
+async def send_delete_event(dataDeletionEvent: func.Out[func.EventGridOutputEvent], json_body, request_id):
     # check blob metadata to find the blob it was copied from
     blob_client = get_blob_client_from_blob_info(
         *get_blob_info_from_topic_and_subject(topic=json_body["topic"], subject=json_body["subject"]))
@@ -78,10 +85,12 @@ def send_delete_event(dataDeletionEvent: func.Out[func.EventGridOutputEvent], js
     logging.info(f"copied from history: {copied_from}")
 
     # signal that the container where we copied from can now be deleted
+    data = {"blob_to_delete": copied_from[-1]}  # last container in copied_from is the one we just copied from
+    offloaded_data = await sb_helpers.wrap_payload_for_offloading(data)
     dataDeletionEvent.set(
         func.EventGridOutputEvent(
             id=str(uuid.uuid4()),
-            data={"blob_to_delete": copied_from[-1]},  # last container in copied_from is the one we just copied from
+            data=offloaded_data,
             subject=request_id,
             event_type="Airlock.DataDeletion",
             event_time=datetime.datetime.now(datetime.UTC),

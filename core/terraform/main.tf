@@ -167,6 +167,7 @@ module "airlock_resources" {
   queue_core_dns_zone_id                = module.network.queue_core_dns_zone_id
   table_core_dns_zone_id                = module.network.table_core_dns_zone_id
   eventgrid_private_dns_zone_id         = module.network.eventgrid_private_dns_zone_id
+  service_bus_messages_storage_account_name = azurerm_storage_account.stg.name
 
   enable_local_debugging        = var.enable_local_debugging
   myip                          = local.myip
@@ -219,6 +220,8 @@ module "resource_processor_vmss_porter" {
   enable_airlock_malware_scanning                  = var.enable_airlock_malware_scanning
   airlock_malware_scan_result_topic_name           = module.airlock_resources.airlock_malware_scan_result_topic_name
   firewall_policy_id                               = module.firewall.firewall_policy_id
+  service_bus_messages_storage_account_name        = azurerm_storage_account.stg.name
+  storage_endpoint_suffix                          = module.terraform_azurerm_environment_configuration.storage_suffix
 
   depends_on = [
     module.network,

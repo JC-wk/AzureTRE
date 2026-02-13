@@ -16,6 +16,7 @@ from db.repositories.airlock_requests import AirlockRequestRepository
 from models.domain.airlock_operations import StepResultStatusUpdateMessage
 from core import config, credentials
 from resources import strings
+from service_bus.helpers import receive_message_payload
 
 
 class AirlockStatusUpdater():
@@ -77,7 +78,8 @@ class AirlockStatusUpdater():
             complete_message = False
 
             try:
-                message = parse_obj_as(StepResultStatusUpdateMessage, json.loads(str(msg)))
+                payload = await receive_message_payload(msg)
+                message = parse_obj_as(StepResultStatusUpdateMessage, json.loads(payload))
 
                 current_span.set_attribute("step_id", message.id)
                 current_span.set_attribute("event_type", message.eventType)

@@ -24,6 +24,9 @@ def get_config() -> dict:
         config["azure_environment"] = os.environ.get("AZURE_ENVIRONMENT", "AzureCloud")
         config["aad_authority_url"] = os.environ.get("AAD_AUTHORITY_URL", "https://login.microsoftonline.com")
         config["microsoft_graph_fqdn"] = os.environ.get("MICROSOFT_GRAPH_FQDN", "graph.microsoft.com")
+        config["service_bus_messages_storage_account_name"] = os.environ.get("SERVICE_BUS_MESSAGES_STORAGE_ACCOUNT_NAME", "")
+        config["storage_endpoint_suffix"] = os.environ.get("STORAGE_ENDPOINT_SUFFIX", "core.windows.net")
+        config["service_bus_message_offload_threshold"] = int(os.environ.get("SERVICE_BUS_MESSAGE_OFFLOAD_THRESHOLD", "200000"))
 
         try:
             config["number_processes_int"] = int(config["number_processes"])
