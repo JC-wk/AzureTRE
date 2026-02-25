@@ -74,7 +74,7 @@ resource "azurerm_servicebus_queue" "service_bus_deployment_status_update_queue"
   # The returned payload might be large, especially for errors.
   # Cosmos is the final destination of the messages where 2048 is the limit.
   # Standard SKU supports up to 256 KB. Premium supports up to 100 MB.
-  max_message_size_in_kilobytes = var.service_bus_sku == "Premium" ? 2048 : 256
+  max_message_size_in_kilobytes = var.service_bus_sku == "Premium" ? 2048 : null
 
   partitioning_enabled = false
   requires_session     = true
