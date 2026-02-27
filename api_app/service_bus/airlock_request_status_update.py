@@ -1,3 +1,5 @@
+from service_bus.helpers import receive_message_payload
+from service_bus.service_bus_consumer import ServiceBusConsumer
 import asyncio
 import json
 import time
@@ -16,13 +18,12 @@ from db.repositories.airlock_requests import AirlockRequestRepository
 from models.domain.airlock_operations import StepResultStatusUpdateMessage
 from core import config, credentials
 from resources import strings
-from service_bus.helpers import receive_message_payload
 
 
-class AirlockStatusUpdater():
+class AirlockStatusUpdater(ServiceBusConsumer):
 
     def __init__(self):
-        pass
+        super().__init__("airlock_status_updater")
 
     async def init_repos(self):
         self.airlock_request_repo = await AirlockRequestRepository.create()
@@ -37,9 +38,13 @@ class AirlockStatusUpdater():
                 try:
                     current_time = time.time()
                     polling_count += 1
+
+                    # Update heartbeat for supervisor monitoring
+                    self.update_heartbeat()
+
                     # Log a heartbeat message every 60 seconds to show the service is still working
                     if current_time - last_heartbeat_time >= 60:
-                        logger.info(f"Queue reader heartbeat: Polled {config.SERVICE_BUS_STEP_RESULT_QUEUE} queue {polling_count} times in the last minute")
+                        logger.info(f"{config.SERVICE_BUS_STEP_RESULT_QUEUE} queue polled {polling_count} times in the last minute")
                         last_heartbeat_time = current_time
                         polling_count = 0
 
@@ -48,30 +53,40 @@ class AirlockStatusUpdater():
                         receiver = service_bus_client.get_queue_receiver(queue_name=config.SERVICE_BUS_STEP_RESULT_QUEUE)
                         logger.debug(f"Looking for new messages on {config.SERVICE_BUS_STEP_RESULT_QUEUE} queue...")
                         async with receiver:
-                            received_msgs = await receiver.receive_messages(max_message_count=10, max_wait_time=1)
-                            for msg in received_msgs:
-                                async with AutoLockRenewer() as renewer:
-                                    renewer.register(receiver, msg, max_lock_renewal_duration=60)
-                                    complete_message = await self.process_message(msg)
-                                    if complete_message:
-                                        await receiver.complete_message(msg)
-                                    else:
-                                        # could have been any kind of transient issue, we'll abandon back to the queue, and retry
-                                        await receiver.abandon_message(msg)
+                            while True:
+                                # Update heartbeat inside the loop
+                                self.update_heartbeat()
+
+                                received_msgs = await receiver.receive_messages(max_message_count=10, max_wait_time=60)
+                                if not received_msgs:
+                                    break
+
+                                for msg in received_msgs:
+                                    async with AutoLockRenewer() as renewer:
+                                        renewer.register(receiver, msg, max_lock_renewal_duration=60)
+                                        complete_message = await self.process_message(msg)
+                                        if complete_message:
+                                            await receiver.complete_message(msg)
+                                        else:
+                                            # could have been any kind of transient issue, we'll abandon back to the queue, and retry
+                                            await receiver.abandon_message(msg)
 
                         await asyncio.sleep(10)
 
                 except OperationTimeoutError:
                     # Timeout occurred whilst connecting to a session - this is expected and indicates no non-empty sessions are available
                     logger.debug("No sessions for this process. Will look again...")
+                    await asyncio.sleep(10)
 
-                except ServiceBusConnectionError:
+                except ServiceBusConnectionError as e:
                     # Occasionally there will be a transient / network-level error in connecting to SB.
-                    logger.info("Unknown Service Bus connection error. Will retry...")
+                    logger.warning(f"Service Bus connection error (will retry): {e}")
+                    await asyncio.sleep(10)
 
                 except Exception as e:
                     # Catch all other exceptions, log them via .exception to get the stack trace, and reconnect
-                    logger.exception(f"Unknown exception. Will retry - {e}")
+                    logger.exception(f"Unexpected error in message processing: {type(e).__name__}: {e}")
+                    await asyncio.sleep(10)
 
     async def process_message(self, msg):
         with tracer.start_as_current_span("process_message") as current_span:

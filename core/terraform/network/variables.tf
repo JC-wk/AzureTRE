@@ -16,3 +16,6 @@ variable "arm_environment" {
 variable "firewall_force_tunnel_ip" {
   type = string
 }
+variable "service_bus_sku" {
+  type = string
+}

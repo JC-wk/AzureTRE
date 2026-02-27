@@ -25,32 +25,22 @@ resource "azurerm_servicebus_namespace" "sb" {
     }
   }
 
-  network_rule_set {
-    default_action                = "Deny"
-    public_network_access_enabled = true
-    trusted_services_allowed      = true
+  dynamic "network_rule_set" {
+    for_each = var.service_bus_sku == "Premium" ? [1] : []
+    content {
+      default_action                = "Deny"
+      public_network_access_enabled = true
+      trusted_services_allowed      = true
 
-    ip_rules = var.enable_local_debugging ? [local.myip] : []
+      ip_rules = var.enable_local_debugging ? [local.myip] : []
 
-    # Always include Airlock subnets
-    network_rules {
-      subnet_id                            = module.network.airlock_events_subnet_id
-      ignore_missing_vnet_service_endpoint = false
-    }
-    network_rules {
-      subnet_id                            = module.network.airlock_notification_subnet_id
-      ignore_missing_vnet_service_endpoint = false
-    }
-
-    # Include core subnets if using Standard SKU because Private Endpoint is not available
-    dynamic "network_rules" {
-      for_each = var.service_bus_sku == "Standard" ? [
-        module.network.web_app_subnet_id,
-        module.network.resource_processor_subnet_id,
-        module.network.airlock_processor_subnet_id
-      ] : []
-      content {
-        subnet_id                            = network_rules.value
+      # Always include Airlock subnets
+      network_rules {
+        subnet_id                            = module.network.airlock_events_subnet_id
+        ignore_missing_vnet_service_endpoint = false
+      }
+      network_rules {
+        subnet_id                            = module.network.airlock_notification_subnet_id
         ignore_missing_vnet_service_endpoint = false
       }
     }

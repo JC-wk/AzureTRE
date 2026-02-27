@@ -96,6 +96,8 @@ module "network" {
   core_address_space       = var.core_address_space
   arm_environment          = var.arm_environment
   firewall_force_tunnel_ip = var.firewall_force_tunnel_ip
+  service_bus_sku          = var.service_bus_sku
+
 }
 
 module "firewall" {
@@ -114,6 +116,7 @@ module "firewall" {
   shared_services_ip_group_id    = module.network.shared_services_ip_group_id
   web_app_ip_group_id            = module.network.web_app_ip_group_id
   airlock_processor_ip_group_id  = module.network.airlock_processor_ip_group_id
+  service_bus_sku                = var.service_bus_sku
 }
 
 module "appgateway" {
@@ -144,29 +147,29 @@ module "appgateway" {
 }
 
 module "airlock_resources" {
-  source                                = "./airlock"
-  tre_id                                = var.tre_id
-  location                              = var.location
-  resource_group_name                   = azurerm_resource_group.core.name
-  airlock_storage_subnet_id             = module.network.airlock_storage_subnet_id
-  airlock_events_subnet_id              = module.network.airlock_events_subnet_id
-  docker_registry_server                = local.docker_registry_server
-  acr_id                                = data.azurerm_container_registry.acr.id
-  api_principal_id                      = azurerm_user_assigned_identity.id.principal_id
-  airlock_app_service_plan_sku          = var.core_app_service_plan_sku
-  airlock_processor_subnet_id           = module.network.airlock_processor_subnet_id
-  airlock_servicebus                    = azurerm_servicebus_namespace.sb
-  airlock_servicebus_fqdn               = azurerm_servicebus_namespace.sb.endpoint
-  applicationinsights_connection_string = module.azure_monitor.app_insights_connection_string
-  enable_malware_scanning               = var.enable_airlock_malware_scanning
-  arm_environment                       = var.arm_environment
-  tre_core_tags                         = local.tre_core_tags
-  log_analytics_workspace_id            = module.azure_monitor.log_analytics_workspace_id
-  blob_core_dns_zone_id                 = module.network.blob_core_dns_zone_id
-  file_core_dns_zone_id                 = module.network.file_core_dns_zone_id
-  queue_core_dns_zone_id                = module.network.queue_core_dns_zone_id
-  table_core_dns_zone_id                = module.network.table_core_dns_zone_id
-  eventgrid_private_dns_zone_id         = module.network.eventgrid_private_dns_zone_id
+  source                                    = "./airlock"
+  tre_id                                    = var.tre_id
+  location                                  = var.location
+  resource_group_name                       = azurerm_resource_group.core.name
+  airlock_storage_subnet_id                 = module.network.airlock_storage_subnet_id
+  airlock_events_subnet_id                  = module.network.airlock_events_subnet_id
+  docker_registry_server                    = local.docker_registry_server
+  acr_id                                    = data.azurerm_container_registry.acr.id
+  api_principal_id                          = azurerm_user_assigned_identity.id.principal_id
+  airlock_app_service_plan_sku              = var.core_app_service_plan_sku
+  airlock_processor_subnet_id               = module.network.airlock_processor_subnet_id
+  airlock_servicebus                        = azurerm_servicebus_namespace.sb
+  airlock_servicebus_fqdn                   = azurerm_servicebus_namespace.sb.endpoint
+  applicationinsights_connection_string     = module.azure_monitor.app_insights_connection_string
+  enable_malware_scanning                   = var.enable_airlock_malware_scanning
+  arm_environment                           = var.arm_environment
+  tre_core_tags                             = local.tre_core_tags
+  log_analytics_workspace_id                = module.azure_monitor.log_analytics_workspace_id
+  blob_core_dns_zone_id                     = module.network.blob_core_dns_zone_id
+  file_core_dns_zone_id                     = module.network.file_core_dns_zone_id
+  queue_core_dns_zone_id                    = module.network.queue_core_dns_zone_id
+  table_core_dns_zone_id                    = module.network.table_core_dns_zone_id
+  eventgrid_private_dns_zone_id             = module.network.eventgrid_private_dns_zone_id
   service_bus_messages_storage_account_name = azurerm_storage_account.stg.name
 
   enable_local_debugging        = var.enable_local_debugging

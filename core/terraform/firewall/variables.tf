@@ -64,3 +64,8 @@ variable "shared_services_ip_group_id" {
   type        = string
   description = "Shared Services IP Group"
 }
+
+variable "service_bus_sku" {
+  type        = string
+  description = "SKU of the Service Bus namespace (Standard, Premium)"
+}

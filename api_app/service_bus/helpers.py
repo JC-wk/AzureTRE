@@ -30,7 +30,7 @@ async def _send_message(message: ServiceBusMessage, queue: str):
     """
     # Claim check pattern
     if config.SERVICE_BUS_MESSAGES_STORAGE_ACCOUNT_NAME:
-        body_str = str(message)
+        body_str = b"".join(message.body).decode("utf-8") if isinstance(message.body, list) else str(message.body)
         if len(body_str) > config.SERVICE_BUS_MESSAGE_OFFLOAD_THRESHOLD:
             logger.info(f"Message size {len(body_str)} exceeds threshold {config.SERVICE_BUS_MESSAGE_OFFLOAD_THRESHOLD}. Offloading to blob storage.")
             blob_url = await _offload_to_blob(body_str)
@@ -67,7 +67,7 @@ async def _offload_to_blob(content: str) -> str:
 
 
 async def receive_message_payload(msg: ServiceBusMessage) -> str:
-    body_str = str(msg)
+    body_str = b"".join(msg.body).decode("utf-8")
     try:
         body_json = json.loads(body_str)
         if "claim_check" in body_json:

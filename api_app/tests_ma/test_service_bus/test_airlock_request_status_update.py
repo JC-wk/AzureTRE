@@ -97,11 +97,12 @@ def sample_airlock_request(status=AirlockRequestStatus.Submitted):
 
 class ServiceBusReceivedMessageMock:
     def __init__(self, message: dict):
-        self.message = json.dumps(message)
+        self._message = json.dumps(message)
+        self.body = [self._message.encode("utf-8")]
         self.correlation_id = "test_correlation_id"
 
     def __str__(self):
-        return self.message
+        return self._message
 
 
 @patch("event_grid.helpers.EventGridPublisherClient")

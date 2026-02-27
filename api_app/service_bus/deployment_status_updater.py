@@ -1,12 +1,13 @@
-import asyncio
 import json
 import uuid
 import time
+import asyncio
+from typing import Dict, List, Any
 
 from pydantic import ValidationError, parse_obj_as
 
 from api.routes.resource_helpers import get_timestamp
-from models.domain.resource import Output
+from models.domain.resource import Output, ResourceType
 from db.repositories.resources_history import ResourceHistoryRepository
 from models.domain.request_action import RequestAction
 from db.repositories.resource_templates import ResourceTemplateRepository
@@ -21,20 +22,21 @@ from db.repositories.resources import ResourceRepository
 from models.domain.operation import DeploymentStatusUpdateMessage, Operation, OperationStep, Status
 from resources import strings
 from services.logging import logger, tracer
+from db.repositories.workspaces import WorkspaceRepository
+from models.schemas.resource import ResourcePatch
+from azure.cosmos.exceptions import CosmosAccessConditionFailedError
+from service_bus.service_bus_consumer import ServiceBusConsumer
 
 
-class DeploymentStatusUpdater():
+class DeploymentStatusUpdater(ServiceBusConsumer):
     def __init__(self):
-        pass
+        super().__init__("deployment_status_updater")
 
     async def init_repos(self):
         self.operations_repo = await OperationRepository.create()
         self.resource_repo = await ResourceRepository.create()
         self.resource_template_repo = await ResourceTemplateRepository.create()
         self.resource_history_repo = await ResourceHistoryRepository.create()
-
-    def run(self, *args, **kwargs):
-        asyncio.run(self.receive_messages())
 
     async def receive_messages(self):
         with tracer.start_as_current_span("deployment_status_receive_messages"):
@@ -45,9 +47,12 @@ class DeploymentStatusUpdater():
                 try:
                     current_time = time.time()
                     polling_count += 1
+
+                    # Update heartbeat for supervisor monitoring
+                    self.update_heartbeat()
                     # Log a heartbeat message every 60 seconds to show the service is still working
                     if current_time - last_heartbeat_time >= 60:
-                        logger.info(f"Queue reader heartbeat: Polled {config.SERVICE_BUS_DEPLOYMENT_STATUS_UPDATE_QUEUE} queue {polling_count} times in the last minute")
+                        logger.info(f"{config.SERVICE_BUS_DEPLOYMENT_STATUS_UPDATE_QUEUE} queue polled {polling_count} times in the last minute")
                         last_heartbeat_time = current_time
                         polling_count = 0
 
@@ -55,33 +60,46 @@ class DeploymentStatusUpdater():
                         service_bus_client = ServiceBusClient(config.SERVICE_BUS_FULLY_QUALIFIED_NAMESPACE, credential)
 
                         logger.debug(f"Looking for new messages on {config.SERVICE_BUS_DEPLOYMENT_STATUS_UPDATE_QUEUE} queue...")
-                        # max_wait_time=1 -> don't hold the session open after processing of the message has finished
-                        async with service_bus_client.get_queue_receiver(queue_name=config.SERVICE_BUS_DEPLOYMENT_STATUS_UPDATE_QUEUE, max_wait_time=1, session_id=NEXT_AVAILABLE_SESSION) as receiver:
+                        # max_wait_time=60 -> wait up to 60 seconds for a session to become available
+                        async with service_bus_client.get_queue_receiver(queue_name=config.SERVICE_BUS_DEPLOYMENT_STATUS_UPDATE_QUEUE, max_wait_time=60, session_id=NEXT_AVAILABLE_SESSION) as receiver:
                             logger.info(f"Got a session containing messages: {receiver.session.session_id}")
                             async with AutoLockRenewer() as renewer:
                                 renewer.register(receiver, receiver.session, max_lock_renewal_duration=60)
-                                async for msg in receiver:
-                                    complete_message = await self.process_message(msg)
-                                    if complete_message:
-                                        await receiver.complete_message(msg)
-                                    else:
-                                        # could have been any kind of transient issue, we'll abandon back to the queue, and retry
-                                        await receiver.abandon_message(msg)
+
+                                while True:
+                                    # Update heartbeat inside the session loop too
+                                    self.update_heartbeat()
+
+                                    received_msgs = await receiver.receive_messages(max_message_count=10, max_wait_time=1)
+                                    if not received_msgs:
+                                        break
+
+                                    for msg in received_msgs:
+                                        complete_message = await self.process_message(msg)
+                                        if complete_message:
+                                            await receiver.complete_message(msg)
+                                        else:
+                                            # could have been any kind of transient issue, we'll abandon back to the queue, and retry
+                                            await receiver.abandon_message(msg)
+
                             logger.info(f"Closing session: {receiver.session.session_id}")
 
                 except OperationTimeoutError:
                     # Timeout occurred whilst connecting to a session - this is expected and indicates no non-empty sessions are available
                     logger.debug("No sessions for this process. Will look again...")
+                    await asyncio.sleep(10)
 
-                except ServiceBusConnectionError:
+                except ServiceBusConnectionError as e:
                     # Occasionally there will be a transient / network-level error in connecting to SB.
-                    logger.info("Unknown Service Bus connection error. Will retry...")
+                    logger.warning(f"Service Bus connection error (will retry): {e}")
+                    await asyncio.sleep(10)
 
                 except Exception as e:
                     # Catch all other exceptions, log them via .exception to get the stack trace, and reconnect
-                    logger.exception(f"Unknown exception. Will retry - {e}")
+                    logger.exception(f"Unexpected error in message processing: {type(e).__name__}: {e}")
+                    await asyncio.sleep(10)
 
-    async def process_message(self, msg):
+    async def process_message(self, msg) -> bool:
         complete_message = False
         message = ""
 
@@ -99,6 +117,7 @@ class DeploymentStatusUpdater():
                 logger.info(f"Update status in DB for {message.operationId} - {message.status}")
             except (json.JSONDecodeError, ValidationError):
                 logger.exception(f"{strings.DEPLOYMENT_STATUS_MESSAGE_FORMAT_INCORRECT}: {msg.correlation_id}")
+                complete_message = True
             except Exception:
                 logger.exception(f"Exception processing message: {msg.correlation_id}")
 
@@ -116,6 +135,11 @@ class DeploymentStatusUpdater():
         try:
             # update the op
             operation = await self.operations_repo.get_operation_by_id(str(message.operationId))
+
+            # Add null safety for operation steps
+            if not operation.steps:
+                raise ValueError(f"Operation {message.operationId} has no steps")
+
             step_to_update = None
             is_last_step = False
 
@@ -129,7 +153,7 @@ class DeploymentStatusUpdater():
                         is_last_step = True
 
             if step_to_update is None:
-                raise f"Error finding step {message.stepId} in operation {message.operationId}"
+                raise ValueError(f"Step {message.stepId} not found in operation {message.operationId}")
 
             # update the step status
             step_to_update.status = message.status
@@ -160,7 +184,8 @@ class DeploymentStatusUpdater():
 
             # more steps in the op to do?
             if is_last_step is False:
-                assert current_step_index < (len(operation.steps) - 1)
+                if current_step_index >= len(operation.steps) - 1:
+                    raise ValueError(f"Step index {current_step_index} is the last step in operation (has {len(operation.steps)} steps), but more steps were expected")
                 next_step = operation.steps[current_step_index + 1]
 
                 # catch any errors in updating the resource - maybe Cosmos / schema invalid etc, and report them back to the op
@@ -188,6 +213,34 @@ class DeploymentStatusUpdater():
                     next_step.status = Status.UpdatingFailed
                     await self.update_overall_operation_status(operation, next_step, is_last_step)
                     await self.operations_repo.update_item(operation)
+            # If the 'main' step succeeded for an uninstall operation, free any allocated address space
+            # owned by a WorkspaceService resource. We trigger cleanup when the step with templateStepId == 'main'
+            # is successful; this ensures the primary resource has been destroyed successfully before attempting to free the ip address space
+            try:
+                # if the step that just succeeded is the main step for this operation, and this is an uninstall,
+                # proceed with post-uninstall cleanup. No need to scan the operation.steps list again.
+                if step_to_update.templateStepId == "main" and step_to_update.is_success() and operation.action == RequestAction.UnInstall:
+                    if resource_to_persist.get("resourceType") == ResourceType.WorkspaceService:
+                        address_to_free = resource_to_persist.get("properties", {}).get("address_space")
+                        parent_workspace_id = resource_to_persist.get("workspaceId")
+                        if address_to_free and parent_workspace_id:
+                            try:
+                                workspace_repo = await WorkspaceRepository.create()
+                                workspace = await workspace_repo.get_workspace_by_id(parent_workspace_id)
+                                workspace_address_spaces = workspace.properties.get("address_spaces", [])
+                                if address_to_free in workspace_address_spaces:
+                                    new_address_spaces = [a for a in workspace_address_spaces if a != address_to_free]
+                                    workspace_patch = ResourcePatch()
+                                    workspace_patch.properties = {"address_spaces": new_address_spaces}
+                                    try:
+                                        await workspace_repo.patch_workspace(workspace, workspace_patch, workspace.etag, self.resource_template_repo, self.resource_history_repo, operation.user, False)
+                                        logger.info(f"Freed address space {address_to_free} from workspace {parent_workspace_id} after successful uninstall of {resource_id}")
+                                    except CosmosAccessConditionFailedError:
+                                        logger.exception("ETag conflict when freeing workspace address space after successful uninstall")
+                            except Exception:
+                                logger.exception("Failed to free workspace address space after successful uninstall")
+            except Exception:
+                logger.exception("Unexpected error during post-uninstall address space cleanup")
 
             result = True
 
@@ -256,7 +309,7 @@ class DeploymentStatusUpdater():
 
         return status
 
-    def create_updated_resource_document(self, resource: dict, message: DeploymentStatusUpdateMessage):
+    def create_updated_resource_document(self, resource: Dict[str, Any], message: DeploymentStatusUpdateMessage) -> Dict[str, Any]:
         """
         Merge the outputs with the resource document to persist
         """
@@ -269,7 +322,7 @@ class DeploymentStatusUpdater():
 
         return resource
 
-    def convert_outputs_to_dict(self, outputs_list: [Output]):
+    def convert_outputs_to_dict(self, outputs_list: List[Output]) -> Dict[str, Any]:
         """
         Convert a list of Porter outputs to a dictionary
         """
