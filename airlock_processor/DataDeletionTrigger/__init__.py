@@ -9,10 +9,10 @@ from shared_code import blob_operations, sb_helpers
 
 async def delete_blob_and_container_if_last_blob(blob_url: str):
     storage_account_name, container_name, blob_name = blob_operations.get_blob_info_from_blob_url(blob_url=blob_url)
-    credential = blob_operations.get_credential()
+    credential = await blob_operations.get_credential()
     async with BlobServiceClient(
-        account_url=blob_operations.get_account_url(storage_account_name),
-        credential=credential) as blob_service_client:
+            account_url=blob_operations.get_account_url(storage_account_name),
+            credential=credential) as blob_service_client:
         container_client = blob_service_client.get_container_client(container_name)
 
         if not blob_name:

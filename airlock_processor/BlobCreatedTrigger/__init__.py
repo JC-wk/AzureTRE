@@ -6,14 +6,15 @@ import re
 import os
 
 import azure.functions as func
+from azure.storage.blob.aio import BlobServiceClient
 
 from shared_code import constants, parsers, sb_helpers
-from shared_code.blob_operations import get_blob_info_from_topic_and_subject, get_blob_client_from_blob_info
+from shared_code.blob_operations import get_blob_info_from_topic_and_subject, get_credential, get_account_url
 
 
 async def main(msg: func.ServiceBusMessage,
-         stepResultEvent: func.Out[func.EventGridOutputEvent],
-         dataDeletionEvent: func.Out[func.EventGridOutputEvent]):
+               stepResultEvent: func.Out[func.EventGridOutputEvent],
+               dataDeletionEvent: func.Out[func.EventGridOutputEvent]):
 
     logging.info("Python ServiceBus topic trigger processed message - A new blob was created!.")
     body = msg.get_body().decode('utf-8')
@@ -78,11 +79,16 @@ async def main(msg: func.ServiceBusMessage,
 
 async def send_delete_event(dataDeletionEvent: func.Out[func.EventGridOutputEvent], json_body, request_id):
     # check blob metadata to find the blob it was copied from
-    blob_client = get_blob_client_from_blob_info(
-        *get_blob_info_from_topic_and_subject(topic=json_body["topic"], subject=json_body["subject"]))
-    blob_metadata = blob_client.get_blob_properties()["metadata"]
-    copied_from = json.loads(blob_metadata["copied_from"])
-    logging.info(f"copied from history: {copied_from}")
+    storage_account_name, container_name, blob_name = get_blob_info_from_topic_and_subject(topic=json_body["topic"], subject=json_body["subject"])
+
+    credential = await get_credential()
+    async with credential:
+        async with BlobServiceClient(account_url=get_account_url(storage_account_name), credential=credential) as blob_service_client:
+            blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
+            blob_properties = await blob_client.get_blob_properties()
+            blob_metadata = blob_properties["metadata"]
+            copied_from = json.loads(blob_metadata["copied_from"])
+            logging.info(f"copied from history: {copied_from}")
 
     # signal that the container where we copied from can now be deleted
     data = {"blob_to_delete": copied_from[-1]}  # last container in copied_from is the one we just copied from

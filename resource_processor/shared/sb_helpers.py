@@ -7,7 +7,7 @@ from azure.identity.aio import DefaultAzureCredential
 from shared.logging import logger
 
 
-async def _get_credential():
+def _get_credential():
     # In VMSS, VMSS_MSI_ID is used. If not set, it will use the system assigned identity or ambient credentials.
     from shared.config import get_config
     config = get_config()
@@ -36,7 +36,7 @@ async def send_message(message: ServiceBusMessage, queue: str, config: dict):
                 application_properties=message.application_properties
             )
 
-    credential = await _get_credential()
+    credential = _get_credential()
     async with credential:
         service_bus_client = ServiceBusClient(config["service_bus_namespace"], credential)
 
@@ -49,14 +49,14 @@ async def send_message(message: ServiceBusMessage, queue: str, config: dict):
 
 async def _offload_to_blob(content: str, config: dict) -> str:
     account_url = f"https://{config['service_bus_messages_storage_account_name']}.blob.{config['storage_endpoint_suffix']}"
-    credential = await _get_credential()
+    credential = _get_credential()
     async with credential:
         blob_service_client = BlobServiceClient(account_url, credential=credential)
         async with blob_service_client:
             blob_name = f"msg-{uuid.uuid4()}.json"
-            blob_client = blob_service_client.get_blob_client(container="sb-messages", blob=blob_name)
+            blob_client = blob_service_client.get_blob_client(container=config["service_bus_messages_container_name"], blob=blob_name)
             await blob_client.upload_blob(content)
-            return f"sb-messages/{blob_name}"
+            return f"{config['service_bus_messages_container_name']}/{blob_name}"
 
 
 async def receive_message_payload(msg: ServiceBusMessage, config: dict) -> str:
@@ -76,7 +76,7 @@ async def receive_message_payload(msg: ServiceBusMessage, config: dict) -> str:
 async def _download_from_blob(blob_path: str, config: dict) -> str:
     account_url = f"https://{config['service_bus_messages_storage_account_name']}.blob.{config['storage_endpoint_suffix']}"
     container_name, blob_name = blob_path.split("/", 1)
-    credential = await _get_credential()
+    credential = _get_credential()
     async with credential:
         blob_service_client = BlobServiceClient(account_url, credential=credential)
         async with blob_service_client:

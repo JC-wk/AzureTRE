@@ -60,6 +60,6 @@ async def _offload_to_blob(content: str) -> str:
         blob_service_client = BlobServiceClient(account_url, credential=credential)
         async with blob_service_client:
             blob_name = f"msg-{uuid.uuid4()}.json"
-            blob_client = blob_service_client.get_blob_client(container="sb-messages", blob=blob_name)
+            blob_client = blob_service_client.get_blob_client(container=constants.SERVICE_BUS_MESSAGES_CONTAINER_NAME, blob=blob_name)
             await blob_client.upload_blob(content)
-            return f"sb-messages/{blob_name}"
+            return f"{constants.SERVICE_BUS_MESSAGES_CONTAINER_NAME}/{blob_name}"

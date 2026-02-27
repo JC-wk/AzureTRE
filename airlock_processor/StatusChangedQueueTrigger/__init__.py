@@ -33,7 +33,7 @@ class ContainersCopyMetadata:
 async def main(msg: func.ServiceBusMessage, stepResultEvent: func.Out[func.EventGridOutputEvent], dataDeletionEvent: func.Out[func.EventGridOutputEvent]):
     try:
         request_properties = await extract_properties(msg)
-        request_files = get_request_files(request_properties) if request_properties.new_status == constants.STAGE_SUBMITTED else None
+        request_files = await get_request_files(request_properties) if request_properties.new_status == constants.STAGE_SUBMITTED else None
         await handle_status_changed(request_properties, stepResultEvent, dataDeletionEvent, request_files)
 
     except NoFilesInRequestException:
@@ -55,7 +55,7 @@ async def handle_status_changed(request_properties: RequestProperties, stepResul
 
     if new_status == constants.STAGE_DRAFT:
         account_name = get_storage_account(status=constants.STAGE_DRAFT, request_type=request_type, short_workspace_id=ws_id)
-        blob_operations.create_container(account_name, req_id)
+        await blob_operations.create_container(account_name, req_id)
         return
 
     if new_status == constants.STAGE_CANCELLED:
@@ -70,9 +70,9 @@ async def handle_status_changed(request_properties: RequestProperties, stepResul
     if (is_require_data_copy(new_status)):
         logging.info('Request with id %s. requires data copy between storage accounts', req_id)
         containers_metadata = get_source_dest_for_copy(new_status=new_status, previous_status=previous_status, request_type=request_type, short_workspace_id=ws_id)
-        blob_operations.create_container(containers_metadata.dest_account_name, req_id)
-        blob_operations.copy_data(containers_metadata.source_account_name,
-                                  containers_metadata.dest_account_name, req_id)
+        await blob_operations.create_container(containers_metadata.dest_account_name, req_id)
+        await blob_operations.copy_data(containers_metadata.source_account_name,
+                                        containers_metadata.dest_account_name, req_id)
         return
 
     # Other statuses which do not require data copy are dismissed as we don't need to do anything...
@@ -224,9 +224,9 @@ async def set_output_event_to_trigger_container_deletion(dataDeletionEvent, requ
     )
 
 
-def get_request_files(request_properties: RequestProperties):
+async def get_request_files(request_properties: RequestProperties):
     storage_account_name = get_storage_account(request_properties.previous_status, request_properties.type, request_properties.workspace_id)
-    return blob_operations.get_request_files(account_name=storage_account_name, request_id=request_properties.request_id)
+    return await blob_operations.get_request_files(account_name=storage_account_name, request_id=request_properties.request_id)
 
 
 def _get_tre_id():
