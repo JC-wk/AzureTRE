@@ -7,7 +7,6 @@ from typing import Dict, List, Any
 from pydantic import ValidationError, parse_obj_as
 
 from api.routes.resource_helpers import get_timestamp
-from models.domain.resource import Output, ResourceType
 from db.repositories.resources_history import ResourceHistoryRepository
 from models.domain.request_action import RequestAction
 from db.repositories.resource_templates import ResourceTemplateRepository
@@ -22,9 +21,6 @@ from db.repositories.resources import ResourceRepository
 from models.domain.operation import DeploymentStatusUpdateMessage, Operation, OperationStep, Status
 from resources import strings
 from services.logging import logger, tracer
-from db.repositories.workspaces import WorkspaceRepository
-from models.schemas.resource import ResourcePatch
-from azure.cosmos.exceptions import CosmosAccessConditionFailedError
 from service_bus.service_bus_consumer import ServiceBusConsumer
 
 
