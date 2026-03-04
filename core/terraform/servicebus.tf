@@ -2,33 +2,11 @@ resource "azurerm_servicebus_namespace" "sb" {
   name                         = "sb-${var.tre_id}"
   location                     = azurerm_resource_group.core.location
   resource_group_name          = azurerm_resource_group.core.name
-  sku                          = "Premium"
-  premium_messaging_partitions = "1"
-  capacity                     = "1"
+  sku                          = var.service_bus_sku
+  premium_messaging_partitions = var.service_bus_sku == "Premium" ? 1 : null
+  capacity                     = var.service_bus_sku == "Premium" ? 1 : 0
   local_auth_enabled           = false
   tags                         = local.tre_core_tags
-
-  # Block public access
-  # See https://docs.microsoft.com/azure/service-bus-messaging/service-bus-service-endpoints
-  network_rule_set {
-    ip_rules = var.enable_local_debugging ? [local.myip] : null
-
-    # Allows the Eventgrid to access the SB
-    trusted_services_allowed = true
-
-    # We must enable the Airlock events subnet to access the SB, as the Eventgrid topics can't send messages over PE
-    # https://docs.microsoft.com/en-us/azure/event-grid/consume-private-endpoints
-    default_action                = "Deny"
-    public_network_access_enabled = true
-    network_rules {
-      subnet_id                            = module.network.airlock_events_subnet_id
-      ignore_missing_vnet_service_endpoint = false
-    }
-    network_rules {
-      subnet_id                            = module.network.airlock_notification_subnet_id
-      ignore_missing_vnet_service_endpoint = false
-    }
-  }
 
   dynamic "customer_managed_key" {
     for_each = var.enable_cmk_encryption ? [1] : []
@@ -44,6 +22,27 @@ resource "azurerm_servicebus_namespace" "sb" {
     content {
       type         = "UserAssigned"
       identity_ids = [azurerm_user_assigned_identity.encryption[0].id]
+    }
+  }
+
+  dynamic "network_rule_set" {
+    for_each = var.service_bus_sku == "Premium" ? [1] : []
+    content {
+      default_action                = "Deny"
+      public_network_access_enabled = true
+      trusted_services_allowed      = true
+
+      ip_rules = var.enable_local_debugging ? [local.myip] : []
+
+      # Always include Airlock subnets
+      network_rules {
+        subnet_id                            = module.network.airlock_events_subnet_id
+        ignore_missing_vnet_service_endpoint = false
+      }
+      network_rules {
+        subnet_id                            = module.network.airlock_notification_subnet_id
+        ignore_missing_vnet_service_endpoint = false
+      }
     }
   }
 
@@ -64,7 +63,8 @@ resource "azurerm_servicebus_queue" "service_bus_deployment_status_update_queue"
 
   # The returned payload might be large, especially for errors.
   # Cosmos is the final destination of the messages where 2048 is the limit.
-  max_message_size_in_kilobytes = 2048 # default=1024
+  # Standard SKU supports up to 256 KB. Premium supports up to 100 MB.
+  max_message_size_in_kilobytes = var.service_bus_sku == "Premium" ? 2048 : null
 
   partitioning_enabled = false
   requires_session     = true
@@ -88,6 +88,7 @@ resource "azurerm_private_dns_zone_virtual_network_link" "servicebuslink" {
 }
 
 resource "azurerm_private_endpoint" "sbpe" {
+  count               = var.service_bus_sku == "Premium" ? 1 : 0
   name                = "pe-${azurerm_servicebus_namespace.sb.name}"
   location            = azurerm_resource_group.core.location
   resource_group_name = azurerm_resource_group.core.name

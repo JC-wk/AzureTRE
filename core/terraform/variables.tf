@@ -300,3 +300,13 @@ variable "private_agent_subnet_id" {
   type        = string
   default     = ""
 }
+
+variable "service_bus_sku" {
+  type        = string
+  default     = "Premium"
+  description = "The SKU of the Service Bus namespace. Must be Standard or Premium as sessions are required."
+  validation {
+    condition     = contains(["Standard", "Premium"], var.service_bus_sku)
+    error_message = "Invalid service_bus_sku value"
+  }
+}

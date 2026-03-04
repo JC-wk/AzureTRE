@@ -71,12 +71,13 @@ test_sb_message_multi_step_3_complete = {
 
 class ServiceBusReceivedMessageMock:
     def __init__(self, message: dict):
-        self.message = json.dumps(message)
+        self._message = json.dumps(message)
+        self.body = [self._message.encode("utf-8")]
         self.correlation_id = "test_correlation_id"
         self.session_id = "test_session_id"
 
     def __str__(self):
-        return self.message
+        return self._message
 
 
 def create_sample_workspace_object(workspace_id):
@@ -124,8 +125,8 @@ async def test_receiving_bad_json_logs_error(logging_mock, payload):
     status_updater = DeploymentStatusUpdater()
     complete_message = await status_updater.process_message(service_bus_received_message_mock)
 
-    # bad message data will fail. we don't mark complete=true since we want the message in the DLQ
-    assert complete_message is False
+    # bad message data will fail. we mark complete=true since we want the message removed from the queue
+    assert complete_message is True
 
     # check we logged the error
     error_message = logging_mock.call_args.args[0]

@@ -57,6 +57,9 @@ write_files:
       OTEL_RESOURCE_ATTRIBUTES=service.name=resource_processor,service.version=${resource_processor_vmss_porter_image_tag}
       OTEL_EXPERIMENTAL_RESOURCE_DETECTORS=azure_vm
       LOGGING_LEVEL=${logging_level}
+      SERVICE_BUS_MESSAGES_STORAGE_ACCOUNT_NAME=${service_bus_messages_storage_account_name}
+      STORAGE_ENDPOINT_SUFFIX=${storage_endpoint_suffix}
+      SERVICE_BUS_MESSAGE_OFFLOAD_THRESHOLD=200000
       ${rp_bundle_values}
   - path: /etc/cron.hourly/docker-prune
     # An hourly cron job to have docker free disk space. Running this frquently

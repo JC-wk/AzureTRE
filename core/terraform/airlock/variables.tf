@@ -107,3 +107,8 @@ variable "encryption_key_versionless_id" {
   type        = string
   description = "Versionless ID of the encryption key in the key vault"
 }
+
+variable "service_bus_messages_storage_account_name" {
+  type        = string
+  description = "Name of the storage account for Service Bus messages offloading"
+}

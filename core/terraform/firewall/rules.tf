@@ -25,6 +25,27 @@ resource "azurerm_firewall_policy_rule_collection_group" "core" {
       ]
       source_ip_groups = [var.resource_processor_ip_group_id]
     }
+
+    dynamic "rule" {
+      for_each = var.service_bus_sku == "Standard" ? [1] : []
+      content {
+        name = "servicebus-standard-egress"
+        protocols = [
+          "TCP"
+        ]
+        destination_addresses = [
+          "ServiceBus"
+        ]
+        destination_ports = [
+          "443",
+          "5671"
+        ]
+        source_ip_groups = [
+          var.resource_processor_ip_group_id,
+          var.web_app_ip_group_id
+        ]
+      }
+    }
   }
 
   network_rule_collection {

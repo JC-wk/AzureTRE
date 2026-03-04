@@ -42,6 +42,8 @@ resource "azurerm_virtual_network" "core" {
         actions = ["Microsoft.Network/virtualNetworks/subnets/action"]
       }
     }
+
+    service_endpoints = ["Microsoft.ServiceBus"]
   }
 
   subnet {
@@ -50,6 +52,7 @@ resource "azurerm_virtual_network" "core" {
     private_endpoint_network_policies = "Disabled"
     security_group                    = azurerm_network_security_group.default_rules.id
     route_table_id                    = azurerm_route_table.rt.id
+    service_endpoints                 = var.service_bus_sku == "Standard" ? ["Microsoft.ServiceBus"] : []
   }
 
   subnet {
@@ -58,6 +61,7 @@ resource "azurerm_virtual_network" "core" {
     private_endpoint_network_policies = "Disabled"
     security_group                    = azurerm_network_security_group.default_rules.id
     route_table_id                    = azurerm_route_table.rt.id
+    service_endpoints                 = ["Microsoft.ServiceBus"]
   }
 
   subnet {
@@ -76,7 +80,7 @@ resource "azurerm_virtual_network" "core" {
       }
     }
 
-    service_endpoints = ["Microsoft.Storage"]
+    service_endpoints = ["Microsoft.Storage", "Microsoft.ServiceBus"]
   }
 
   subnet {
@@ -84,7 +88,6 @@ resource "azurerm_virtual_network" "core" {
     address_prefixes                  = [local.airlock_notifications_subnet_address_prefix]
     private_endpoint_network_policies = "Disabled"
     security_group                    = azurerm_network_security_group.default_rules.id
-
     delegation {
       name = "delegation"
 

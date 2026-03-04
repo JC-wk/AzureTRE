@@ -35,6 +35,31 @@ resource "azurerm_storage_account" "stg" {
   lifecycle { ignore_changes = [infrastructure_encryption_enabled, tags] }
 }
 
+resource "azurerm_storage_container" "sb_messages" {
+  name                  = "sb-messages"
+  storage_account_id    = azurerm_storage_account.stg.id
+  container_access_type = "private"
+}
+
+resource "azurerm_role_assignment" "api_stg_blob_contributor" {
+  scope                = azurerm_storage_account.stg.id
+  role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = azurerm_user_assigned_identity.id.principal_id
+}
+
+resource "azurerm_role_assignment" "rp_stg_blob_contributor" {
+  count                = var.resource_processor_type == "vmss_porter" ? 1 : 0
+  scope                = azurerm_storage_account.stg.id
+  role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = module.resource_processor_vmss_porter[0].vmss_msi_principal_id
+}
+
+resource "azurerm_role_assignment" "airlock_stg_blob_contributor" {
+  scope                = azurerm_storage_account.stg.id
+  role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = module.airlock_resources.airlock_id_principal_id
+}
+
 resource "azurerm_private_endpoint" "blobpe" {
   name                = "pe-blob-${var.tre_id}"
   location            = azurerm_resource_group.core.location

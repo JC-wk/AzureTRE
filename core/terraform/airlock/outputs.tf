@@ -21,3 +21,7 @@ output "event_grid_airlock_notification_topic_resource_id" {
 output "airlock_malware_scan_result_topic_name" {
   value = local.scan_result_topic_name
 }
+
+output "airlock_id_principal_id" {
+  value = azurerm_user_assigned_identity.airlock_id.principal_id
+}

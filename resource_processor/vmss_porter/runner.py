@@ -7,6 +7,7 @@ import sys
 from helpers.commands import azure_acr_login_command, azure_login_command, build_porter_command, build_porter_command_for_outputs, apply_porter_credentials_sets_command, run_command_helper
 from shared.config import get_config
 from helpers.httpserver import start_server
+from resource_processor.shared import sb_helpers
 
 from shared.logging import initialize_logging, logger, tracer
 from shared.config import VERSION
@@ -58,53 +59,71 @@ async def receive_message(service_bus_client, config: dict, keep_running=lambda:
                 polling_count = 0
 
             logger.debug("Looking for new session...")
-            # max_wait_time=1 -> don't hold the session open after processing of the message has finished
-            async with service_bus_client.get_queue_receiver(queue_name=q_name, max_wait_time=1, session_id=NEXT_AVAILABLE_SESSION) as receiver:
+            # max_wait_time=60 -> wait up to 60 seconds for a session to become available
+            async with service_bus_client.get_queue_receiver(queue_name=q_name, max_wait_time=60, session_id=NEXT_AVAILABLE_SESSION) as receiver:
                 logger.info(f"Got a session containing messages: {receiver.session.session_id}")
                 async with AutoLockRenewer() as renewer:
                     # allow a session to be auto lock renewed for up to an hour - if it's processing a message
                     renewer.register(receiver, receiver.session, max_lock_renewal_duration=3600)
 
-                    async for msg in receiver:
-                        result = True
-                        message = ""
+                    while True:
+                        polling_count += 1
+                        # Update heartbeat inside the session loop
+                        if time.time() - last_heartbeat_time >= 60:
+                            logger.info(f"Queue reader heartbeat: Polled for messages {polling_count} times in the last minute")
+                            last_heartbeat_time = time.time()
+                            polling_count = 0
 
-                        try:
-                            message = json.loads(str(msg))
-                        except (json.JSONDecodeError) as e:
-                            logger.error(f"Received bad service bus resource request message: {e}")
+                        received_msgs = await receiver.receive_messages(max_message_count=10, max_wait_time=1)
+                        if not received_msgs:
+                            break
 
-                        with tracer.start_as_current_span("receive_message") as current_span:
-                            current_span.set_attribute("resource_id", message["id"])
-                            current_span.set_attribute("action", message["action"])
-                            current_span.set_attribute("step_id", message["stepId"])
-                            current_span.set_attribute("operation_id", message["operationId"])
-                            logger.info(f"Message received for resource_id={message['id']}, operation_id={message['operationId']}, step_id={message['stepId']}")
+                        for msg in received_msgs:
+                            result = True
+                            message = ""
 
-                            result = await invoke_porter_action(message, service_bus_client, config)
+                            try:
+                                payload = await sb_helpers.receive_message_payload(msg, config)
+                                message = json.loads(payload)
+                            except (json.JSONDecodeError) as e:
+                                logger.error(f"Received bad service bus resource request message: {e}")
+                                await receiver.complete_message(msg)
+                                continue
 
-                            if result:
-                                logger.info(f"Resource request for {message} is complete")
-                            else:
-                                logger.error('Message processing failed!')
+                            with tracer.start_as_current_span("receive_message") as current_span:
+                                current_span.set_attribute("resource_id", message["id"])
+                                current_span.set_attribute("action", message["action"])
+                                current_span.set_attribute("step_id", message["stepId"])
+                                current_span.set_attribute("operation_id", message["operationId"])
+                                logger.info(f"Message received for resource_id={message['id']}, operation_id={message['operationId']}, step_id={message['stepId']}")
 
-                            logger.info(f"Message for resource_id={message['id']}, operation_id={message['operationId']} processed as {result} and marked complete.")
-                            await receiver.complete_message(msg)
+                                result = await invoke_porter_action(message, service_bus_client, config)
 
-                    logger.info(f"Closing session: {receiver.session.session_id}")
+                                if result:
+                                    logger.info(f"Resource request for {message} is complete")
+                                else:
+                                    logger.error('Message processing failed!')
+
+                                logger.info(f"Message for resource_id={message['id']}, operation_id={message['operationId']} processed as {result} and marked complete.")
+                                await receiver.complete_message(msg)
+
+                logger.info(f"Closing session: {receiver.session.session_id}")
 
         except OperationTimeoutError:
             # Timeout occurred whilst connecting to a session - this is expected and indicates no non-empty sessions are available
             logger.debug("No sessions for this process. Will look again...")
+            await asyncio.sleep(10)
 
         except ServiceBusConnectionError:
             # Occasionally there will be a transient / network-level error in connecting to SB.
             logger.info("Unknown Service Bus connection error. Will retry...")
+            await asyncio.sleep(10)
 
         except Exception:
             # Catch all other exceptions, log them via .exception to get the stack trace, sleep, and reconnect
 
             logger.exception("Unknown exception. Will retry...")
+            await asyncio.sleep(10)
 
 
 async def run_porter(command_parts_list: list, config: dict):
@@ -169,11 +188,10 @@ async def invoke_porter_action(msg_body: dict, sb_client: ServiceBusClient, conf
     installation_id = msg_body["id"]
     action = msg_body["action"]
     logger.info(f"{action} action starting for {installation_id}...")
-    sb_sender = sb_client.get_queue_sender(queue_name=config["deployment_status_queue"])
 
     # post an update message to set the status to an 'in progress' one
     resource_request_message = service_bus_message_generator(msg_body, statuses.in_progress_status_string_for[action], "Job starting")
-    await sb_sender.send_messages(ServiceBusMessage(body=resource_request_message, correlation_id=msg_body["id"], session_id=msg_body["operationId"]))
+    await sb_helpers.send_message(ServiceBusMessage(body=resource_request_message, correlation_id=msg_body["id"], session_id=msg_body["operationId"]), config["deployment_status_queue"], config)
     logger.info(f'Sent status message for {installation_id} - {statuses.in_progress_status_string_for[action]} - Job starting')
 
     # Build and run porter command (flagging if its a built-in action or custom so we can adapt porter command appropriately)
@@ -237,7 +255,7 @@ async def invoke_porter_action(msg_body: dict, sb_client: ServiceBusClient, conf
 
         resource_request_message = service_bus_message_generator(msg_body, status_for_sb_message, status_message, outputs)
 
-    await sb_sender.send_messages(ServiceBusMessage(body=resource_request_message, correlation_id=msg_body["id"], session_id=msg_body["operationId"]))
+    await sb_helpers.send_message(ServiceBusMessage(body=resource_request_message, correlation_id=msg_body["id"], session_id=msg_body["operationId"]), config["deployment_status_queue"], config)
     logger.info(f"Sent status message for {installation_id}: {status_for_sb_message}")
 
     # return true as want to continue processing the message
@@ -276,10 +294,15 @@ async def get_porter_outputs(msg_body: dict, config: dict):
 
 
 async def runner(process_number: int, config: dict):
-    with tracer.start_as_current_span(process_number):
-        async with default_credentials(config["vmss_msi_id"]) as credential:
-            service_bus_client = ServiceBusClient(config["service_bus_namespace"], credential)
-            await receive_message(service_bus_client, config)
+    with tracer.start_as_current_span(str(process_number)):
+        while True:
+            try:
+                async with default_credentials(config["vmss_msi_id"]) as credential:
+                    async with ServiceBusClient(config["service_bus_namespace"], credential) as service_bus_client:
+                        await receive_message(service_bus_client, config)
+            except Exception:
+                logger.exception("Exception in runner loop")
+            await asyncio.sleep(10)
 
 
 async def check_runners(processes: list, httpserver: Process, keep_running=lambda: True):
@@ -318,7 +341,7 @@ if __name__ == "__main__":
         logger.info(f"Starting {num} processes...")
         for i in range(num):
             logger.info(f"Starting process {str(i)}")
-            process = Process(target=lambda: asyncio.run(runner(i, config)))
+            process = Process(target=lambda i=i: asyncio.run(runner(i, config)))
             processes.append(process)
             process.start()
 

@@ -5,15 +5,16 @@ import datetime
 import uuid
 import json
 import os
-from shared_code import constants, blob_operations, parsers
+from shared_code import constants, blob_operations, parsers, sb_helpers
 
 
-def main(msg: func.ServiceBusMessage,
+async def main(msg: func.ServiceBusMessage,
          outputEvent: func.Out[func.EventGridOutputEvent]):
 
     logging.info("Python ServiceBus queue trigger processed message - Malware scan result arrived!")
     body = msg.get_body().decode('utf-8')
-    logging.info(f'Python ServiceBus queue trigger processed message: {body}')
+    logging.info(f'Python ServiceBus queue trigger raw body: {body}')
+    payload = await sb_helpers.receive_message_payload(body)
     status_message = None
 
     try:
@@ -31,7 +32,7 @@ def main(msg: func.ServiceBusMessage,
         raise Exception(error_msg)
 
     try:
-        json_body = json.loads(body)
+        json_body = json.loads(payload)
         blob_uri = json_body["data"]["blobUri"]
         verdict = json_body["data"]["scanResultType"]
     except KeyError as e:
@@ -53,10 +54,12 @@ def main(msg: func.ServiceBusMessage,
         status_message = verdict
 
     # Send the event to indicate this step is done (and to request a new status change)
+    data = {"completed_step": completed_step, "new_status": new_status, "request_id": request_id, "status_message": status_message}
+    offloaded_data = await sb_helpers.wrap_payload_for_offloading(data)
     outputEvent.set(
         func.EventGridOutputEvent(
             id=str(uuid.uuid4()),
-            data={"completed_step": completed_step, "new_status": new_status, "request_id": request_id, "status_message": status_message},
+            data=offloaded_data,
             subject=request_id,
             event_type="Airlock.StepResult",
             event_time=datetime.datetime.now(datetime.UTC),

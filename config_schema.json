@@ -133,6 +133,14 @@
           "description": "VMSS SKU for the Resource Processor scale set (e.g., Standard_B2s).",
           "type": "string"
         },
+        "service_bus_sku": {
+          "description": "SKU of the Service Bus namespace. Must be Standard or Premium as sessions are required.",
+          "type": "string",
+          "enum": [
+            "Standard",
+            "Premium"
+          ]
+        },
         "user_management_enabled": {
           "description": "When true, TreAdmins can assign/deassign users to workspaces via the UI.",
           "type": "boolean"
