@@ -7,26 +7,6 @@ resource "azurerm_virtual_network" "core" {
   lifecycle { ignore_changes = [tags] }
 
   subnet {
-    name             = "AzureBastionSubnet"
-    address_prefixes = [local.bastion_subnet_address_prefix]
-    security_group   = azurerm_network_security_group.bastion.id
-  }
-
-  subnet {
-    name             = "AzureFirewallSubnet"
-    address_prefixes = [local.firewall_subnet_address_space]
-    route_table_id   = var.firewall_force_tunnel_ip != "" ? azurerm_route_table.fw_tunnel_rt[0].id : null
-  }
-
-  subnet {
-    name                                          = "AppGwSubnet"
-    address_prefixes                              = [local.app_gw_subnet_address_prefix]
-    private_endpoint_network_policies             = "Disabled"
-    private_link_service_network_policies_enabled = true
-    security_group                                = azurerm_network_security_group.app_gw.id
-  }
-
-  subnet {
     name                                          = "WebAppSubnet"
     address_prefixes                              = [local.web_app_subnet_address_prefix]
     private_endpoint_network_policies             = "Disabled"
@@ -113,10 +93,57 @@ resource "azurerm_virtual_network" "core" {
 
     service_endpoints = ["Microsoft.ServiceBus"]
   }
+}
+
+resource "azurerm_virtual_network" "firewall" {
+  name                = "vnet-fw-${var.tre_id}"
+  location            = var.location
+  resource_group_name = var.resource_group_name
+  address_space       = [local.firewall_vnet_address_space]
+  tags                = local.tre_core_tags
+  lifecycle { ignore_changes = [tags] }
+
+  subnet {
+    name             = "AzureFirewallSubnet"
+    address_prefixes = [cidrsubnet(local.firewall_vnet_address_space, 2, 0)]
+    route_table_id   = var.firewall_force_tunnel_ip != "" ? azurerm_route_table.fw_tunnel_rt[0].id : null
+  }
 
   subnet {
     name             = "AzureFirewallManagementSubnet"
-    address_prefixes = [local.firewall_management_subnet_address_prefix]
+    address_prefixes = [cidrsubnet(local.firewall_vnet_address_space, 2, 1)]
+  }
+}
+
+resource "azurerm_virtual_network" "bastion" {
+  name                = "vnet-bas-${var.tre_id}"
+  location            = var.location
+  resource_group_name = var.resource_group_name
+  address_space       = [local.bastion_vnet_address_space]
+  tags                = local.tre_core_tags
+  lifecycle { ignore_changes = [tags] }
+
+  subnet {
+    name             = "AzureBastionSubnet"
+    address_prefixes = [cidrsubnet(local.bastion_vnet_address_space, 2, 0)]
+    security_group   = azurerm_network_security_group.bastion.id
+  }
+}
+
+resource "azurerm_virtual_network" "appgw" {
+  name                = "vnet-appgw-${var.tre_id}"
+  location            = var.location
+  resource_group_name = var.resource_group_name
+  address_space       = [local.appgw_vnet_address_space]
+  tags                = local.tre_core_tags
+  lifecycle { ignore_changes = [tags] }
+
+  subnet {
+    name                                          = "AppGwSubnet"
+    address_prefixes                              = [cidrsubnet(local.appgw_vnet_address_space, 2, 0)]
+    private_endpoint_network_policies             = "Disabled"
+    private_link_service_network_policies_enabled = true
+    security_group                                = azurerm_network_security_group.app_gw.id
   }
 }
 
@@ -154,6 +181,72 @@ resource "azurerm_ip_group" "airlock_processor" {
   cidrs               = [local.airlock_processor_subnet_address_prefix]
   tags                = local.tre_core_tags
   lifecycle { ignore_changes = [tags] }
+}
+
+resource "azurerm_virtual_network_peering" "core_to_firewall" {
+  name                         = "core-to-firewall"
+  resource_group_name          = var.resource_group_name
+  virtual_network_name         = azurerm_virtual_network.core.name
+  remote_virtual_network_id    = azurerm_virtual_network.firewall.id
+  allow_virtual_network_access = true
+  allow_forwarded_traffic      = true
+  allow_gateway_transit        = false
+  use_remote_gateways          = false
+}
+
+resource "azurerm_virtual_network_peering" "firewall_to_core" {
+  name                         = "firewall-to-core"
+  resource_group_name          = var.resource_group_name
+  virtual_network_name         = azurerm_virtual_network.firewall.name
+  remote_virtual_network_id    = azurerm_virtual_network.core.id
+  allow_virtual_network_access = true
+  allow_forwarded_traffic      = true
+  allow_gateway_transit        = false
+  use_remote_gateways          = false
+}
+
+resource "azurerm_virtual_network_peering" "core_to_bastion" {
+  name                         = "core-to-bastion"
+  resource_group_name          = var.resource_group_name
+  virtual_network_name         = azurerm_virtual_network.core.name
+  remote_virtual_network_id    = azurerm_virtual_network.bastion.id
+  allow_virtual_network_access = true
+  allow_forwarded_traffic      = true
+  allow_gateway_transit        = false
+  use_remote_gateways          = false
+}
+
+resource "azurerm_virtual_network_peering" "bastion_to_core" {
+  name                         = "bastion-to-core"
+  resource_group_name          = var.resource_group_name
+  virtual_network_name         = azurerm_virtual_network.bastion.name
+  remote_virtual_network_id    = azurerm_virtual_network.core.id
+  allow_virtual_network_access = true
+  allow_forwarded_traffic      = true
+  allow_gateway_transit        = false
+  use_remote_gateways          = false
+}
+
+resource "azurerm_virtual_network_peering" "core_to_appgw" {
+  name                         = "core-to-appgw"
+  resource_group_name          = var.resource_group_name
+  virtual_network_name         = azurerm_virtual_network.core.name
+  remote_virtual_network_id    = azurerm_virtual_network.appgw.id
+  allow_virtual_network_access = true
+  allow_forwarded_traffic      = true
+  allow_gateway_transit        = false
+  use_remote_gateways          = false
+}
+
+resource "azurerm_virtual_network_peering" "appgw_to_core" {
+  name                         = "appgw-to-core"
+  resource_group_name          = var.resource_group_name
+  virtual_network_name         = azurerm_virtual_network.appgw.name
+  remote_virtual_network_id    = azurerm_virtual_network.core.id
+  allow_virtual_network_access = true
+  allow_forwarded_traffic      = true
+  allow_gateway_transit        = false
+  use_remote_gateways          = false
 }
 
 module "terraform_azurerm_environment_configuration" {

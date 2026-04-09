@@ -112,6 +112,16 @@ resource "azurerm_private_dns_zone_virtual_network_link" "azurewebsites" {
   lifecycle { ignore_changes = [tags] }
 }
 
+resource "azurerm_private_dns_zone_virtual_network_link" "azurewebsites_appgw" {
+  resource_group_name   = var.resource_group_name
+  virtual_network_id    = azurerm_virtual_network.appgw.id
+  private_dns_zone_name = azurerm_private_dns_zone.azurewebsites.name
+  name                  = "azurewebsites-appgw-link"
+  registration_enabled  = false
+  tags                  = local.tre_core_tags
+  lifecycle { ignore_changes = [tags] }
+}
+
 resource "azurerm_private_dns_zone" "static_web" {
   name                = module.terraform_azurerm_environment_configuration.private_links["privatelink.web.core.windows.net"]
   resource_group_name = var.resource_group_name

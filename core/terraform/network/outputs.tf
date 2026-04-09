@@ -2,20 +2,32 @@ output "core_vnet_id" {
   value = azurerm_virtual_network.core.id
 }
 
+output "firewall_vnet_id" {
+  value = azurerm_virtual_network.firewall.id
+}
+
+output "bastion_vnet_id" {
+  value = azurerm_virtual_network.bastion.id
+}
+
+output "appgw_vnet_id" {
+  value = azurerm_virtual_network.appgw.id
+}
+
 output "bastion_subnet_id" {
-  value = "${azurerm_virtual_network.core.id}/subnets/AzureBastionSubnet"
+  value = "${azurerm_virtual_network.bastion.id}/subnets/AzureBastionSubnet"
 }
 
 output "azure_firewall_subnet_id" {
-  value = "${azurerm_virtual_network.core.id}/subnets/AzureFirewallSubnet"
+  value = "${azurerm_virtual_network.firewall.id}/subnets/AzureFirewallSubnet"
 }
 
 output "firewall_management_subnet_id" {
-  value = "${azurerm_virtual_network.core.id}/subnets/AzureFirewallManagementSubnet"
+  value = "${azurerm_virtual_network.firewall.id}/subnets/AzureFirewallManagementSubnet"
 }
 
 output "app_gw_subnet_id" {
-  value = "${azurerm_virtual_network.core.id}/subnets/AppGwSubnet"
+  value = "${azurerm_virtual_network.appgw.id}/subnets/AppGwSubnet"
 }
 
 output "web_app_subnet_id" {
