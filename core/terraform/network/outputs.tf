@@ -3,47 +3,47 @@ output "core_vnet_id" {
 }
 
 output "bastion_subnet_id" {
-  value = "${azurerm_virtual_network.core.id}/subnets/AzureBastionSubnet"
+  value = azurerm_subnet.bastion.id
 }
 
 output "azure_firewall_subnet_id" {
-  value = "${azurerm_virtual_network.core.id}/subnets/AzureFirewallSubnet"
+  value = azurerm_subnet.firewall.id
 }
 
 output "firewall_management_subnet_id" {
-  value = "${azurerm_virtual_network.core.id}/subnets/AzureFirewallManagementSubnet"
+  value = azurerm_subnet.firewall_management.id
 }
 
 output "app_gw_subnet_id" {
-  value = "${azurerm_virtual_network.core.id}/subnets/AppGwSubnet"
+  value = azurerm_subnet.app_gw.id
 }
 
 output "web_app_subnet_id" {
-  value = "${azurerm_virtual_network.core.id}/subnets/WebAppSubnet"
+  value = azurerm_subnet.web_app.id
 }
 
 output "shared_subnet_id" {
-  value = "${azurerm_virtual_network.core.id}/subnets/SharedSubnet"
+  value = azurerm_subnet.shared.id
 }
 
 output "resource_processor_subnet_id" {
-  value = "${azurerm_virtual_network.core.id}/subnets/ResourceProcessorSubnet"
+  value = azurerm_subnet.resource_processor.id
 }
 
 output "airlock_processor_subnet_id" {
-  value = "${azurerm_virtual_network.core.id}/subnets/AirlockProcessorSubnet"
+  value = azurerm_subnet.airlock_processor.id
 }
 
 output "airlock_notification_subnet_id" {
-  value = "${azurerm_virtual_network.core.id}/subnets/AirlockNotifiactionSubnet"
+  value = azurerm_subnet.airlock_notification.id
 }
 
 output "airlock_storage_subnet_id" {
-  value = "${azurerm_virtual_network.core.id}/subnets/AirlockStorageSubnet"
+  value = azurerm_subnet.airlock_storage.id
 }
 
 output "airlock_events_subnet_id" {
-  value = "${azurerm_virtual_network.core.id}/subnets/AirlockEventsSubnet"
+  value = azurerm_subnet.airlock_events.id
 }
 
 output "route_table_name" {
@@ -116,4 +116,3 @@ output "airlock_processor_ip_group_id" {
 output "web_app_ip_group_id" {
   value = azurerm_ip_group.webapp.id
 }
-

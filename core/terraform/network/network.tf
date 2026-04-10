@@ -5,119 +5,206 @@ resource "azurerm_virtual_network" "core" {
   address_space       = [var.core_address_space]
   tags                = local.tre_core_tags
   lifecycle { ignore_changes = [tags] }
+}
 
-  subnet {
-    name             = "AzureBastionSubnet"
-    address_prefixes = [local.bastion_subnet_address_prefix]
-    security_group   = azurerm_network_security_group.bastion.id
+resource "azurerm_subnet" "bastion" {
+  name                 = "AzureBastionSubnet"
+  resource_group_name  = var.resource_group_name
+  virtual_network_name = azurerm_virtual_network.core.name
+  address_prefixes     = [local.bastion_subnet_address_prefix]
+}
+
+resource "azurerm_subnet_network_security_group_association" "bastion" {
+  subnet_id                 = azurerm_subnet.bastion.id
+  network_security_group_id = azurerm_network_security_group.bastion.id
+}
+
+resource "azurerm_subnet" "firewall" {
+  name                 = "AzureFirewallSubnet"
+  resource_group_name  = var.resource_group_name
+  virtual_network_name = azurerm_virtual_network.core.name
+  address_prefixes     = [local.firewall_subnet_address_space]
+}
+
+resource "azurerm_subnet_route_table_association" "firewall" {
+  count          = var.firewall_force_tunnel_ip != "" ? 1 : 0
+  subnet_id      = azurerm_subnet.firewall.id
+  route_table_id = azurerm_route_table.fw_tunnel_rt[0].id
+}
+
+resource "azurerm_subnet" "app_gw" {
+  name                                          = "AppGwSubnet"
+  resource_group_name                           = var.resource_group_name
+  virtual_network_name                          = azurerm_virtual_network.core.name
+  address_prefixes                              = [local.app_gw_subnet_address_prefix]
+  private_endpoint_network_policies             = "Disabled"
+  private_link_service_network_policies_enabled = true
+}
+
+resource "azurerm_subnet_network_security_group_association" "app_gw" {
+  subnet_id                 = azurerm_subnet.app_gw.id
+  network_security_group_id = azurerm_network_security_group.app_gw.id
+}
+
+resource "azurerm_subnet" "web_app" {
+  name                                          = "WebAppSubnet"
+  resource_group_name                           = var.resource_group_name
+  virtual_network_name                          = azurerm_virtual_network.core.name
+  address_prefixes                              = [local.web_app_subnet_address_prefix]
+  private_endpoint_network_policies             = "Disabled"
+  private_link_service_network_policies_enabled = true
+
+  delegation {
+    name = "delegation"
+
+    service_delegation {
+      name    = "Microsoft.Web/serverFarms"
+      actions = ["Microsoft.Network/virtualNetworks/subnets/action"]
+    }
   }
+}
 
-  subnet {
-    name             = "AzureFirewallSubnet"
-    address_prefixes = [local.firewall_subnet_address_space]
-    route_table_id   = var.firewall_force_tunnel_ip != "" ? azurerm_route_table.fw_tunnel_rt[0].id : null
-  }
+resource "azurerm_subnet_network_security_group_association" "web_app" {
+  subnet_id                 = azurerm_subnet.web_app.id
+  network_security_group_id = azurerm_network_security_group.default_rules.id
+}
 
-  subnet {
-    name                                          = "AppGwSubnet"
-    address_prefixes                              = [local.app_gw_subnet_address_prefix]
-    private_endpoint_network_policies             = "Disabled"
-    private_link_service_network_policies_enabled = true
-    security_group                                = azurerm_network_security_group.app_gw.id
-  }
+resource "azurerm_subnet_route_table_association" "web_app" {
+  subnet_id      = azurerm_subnet.web_app.id
+  route_table_id = azurerm_route_table.rt.id
+}
 
-  subnet {
-    name                                          = "WebAppSubnet"
-    address_prefixes                              = [local.web_app_subnet_address_prefix]
-    private_endpoint_network_policies             = "Disabled"
-    private_link_service_network_policies_enabled = true
-    security_group                                = azurerm_network_security_group.default_rules.id
-    route_table_id                                = azurerm_route_table.rt.id
+resource "azurerm_subnet" "shared" {
+  name                              = "SharedSubnet"
+  resource_group_name               = var.resource_group_name
+  virtual_network_name              = azurerm_virtual_network.core.name
+  address_prefixes                  = [local.shared_services_subnet_address_prefix]
+  private_endpoint_network_policies = "Disabled"
+}
 
-    delegation {
-      name = "delegation"
+resource "azurerm_subnet_network_security_group_association" "shared" {
+  subnet_id                 = azurerm_subnet.shared.id
+  network_security_group_id = azurerm_network_security_group.default_rules.id
+}
 
-      service_delegation {
-        name    = "Microsoft.Web/serverFarms"
-        actions = ["Microsoft.Network/virtualNetworks/subnets/action"]
-      }
+resource "azurerm_subnet_route_table_association" "shared" {
+  subnet_id      = azurerm_subnet.shared.id
+  route_table_id = azurerm_route_table.rt.id
+}
+
+resource "azurerm_subnet" "resource_processor" {
+  name                              = "ResourceProcessorSubnet"
+  resource_group_name               = var.resource_group_name
+  virtual_network_name              = azurerm_virtual_network.core.name
+  address_prefixes                  = [local.resource_processor_subnet_address_prefix]
+  private_endpoint_network_policies = "Disabled"
+}
+
+resource "azurerm_subnet_network_security_group_association" "resource_processor" {
+  subnet_id                 = azurerm_subnet.resource_processor.id
+  network_security_group_id = azurerm_network_security_group.default_rules.id
+}
+
+resource "azurerm_subnet_route_table_association" "resource_processor" {
+  subnet_id      = azurerm_subnet.resource_processor.id
+  route_table_id = azurerm_route_table.rt.id
+}
+
+resource "azurerm_subnet" "airlock_processor" {
+  name                              = "AirlockProcessorSubnet"
+  resource_group_name               = var.resource_group_name
+  virtual_network_name              = azurerm_virtual_network.core.name
+  address_prefixes                  = [local.airlock_processor_subnet_address_prefix]
+  private_endpoint_network_policies = "Disabled"
+
+  delegation {
+    name = "delegation"
+
+    service_delegation {
+      name    = "Microsoft.Web/serverFarms"
+      actions = ["Microsoft.Network/virtualNetworks/subnets/action"]
     }
   }
 
-  subnet {
-    name                              = "SharedSubnet"
-    address_prefixes                  = [local.shared_services_subnet_address_prefix]
-    private_endpoint_network_policies = "Disabled"
-    security_group                    = azurerm_network_security_group.default_rules.id
-    route_table_id                    = azurerm_route_table.rt.id
-  }
+  service_endpoints = ["Microsoft.Storage"]
+}
 
-  subnet {
-    name                              = "ResourceProcessorSubnet"
-    address_prefixes                  = [local.resource_processor_subnet_address_prefix]
-    private_endpoint_network_policies = "Disabled"
-    security_group                    = azurerm_network_security_group.default_rules.id
-    route_table_id                    = azurerm_route_table.rt.id
-  }
+resource "azurerm_subnet_network_security_group_association" "airlock_processor" {
+  subnet_id                 = azurerm_subnet.airlock_processor.id
+  network_security_group_id = azurerm_network_security_group.default_rules.id
+}
 
-  subnet {
-    name                              = "AirlockProcessorSubnet"
-    address_prefixes                  = [local.airlock_processor_subnet_address_prefix]
-    private_endpoint_network_policies = "Disabled"
-    security_group                    = azurerm_network_security_group.default_rules.id
-    route_table_id                    = azurerm_route_table.rt.id
+resource "azurerm_subnet_route_table_association" "airlock_processor" {
+  subnet_id      = azurerm_subnet.airlock_processor.id
+  route_table_id = azurerm_route_table.rt.id
+}
 
-    delegation {
-      name = "delegation"
+resource "azurerm_subnet" "airlock_notification" {
+  name                              = "AirlockNotifiactionSubnet"
+  resource_group_name               = var.resource_group_name
+  virtual_network_name              = azurerm_virtual_network.core.name
+  address_prefixes                  = [local.airlock_notifications_subnet_address_prefix]
+  private_endpoint_network_policies = "Disabled"
 
-      service_delegation {
-        name    = "Microsoft.Web/serverFarms"
-        actions = ["Microsoft.Network/virtualNetworks/subnets/action"]
-      }
+  delegation {
+    name = "delegation"
+
+    service_delegation {
+      name    = "Microsoft.Web/serverFarms"
+      actions = ["Microsoft.Network/virtualNetworks/subnets/action"]
     }
-
-    service_endpoints = ["Microsoft.Storage"]
   }
+  service_endpoints = ["Microsoft.ServiceBus"]
+}
 
-  subnet {
-    name                              = "AirlockNotifiactionSubnet"
-    address_prefixes                  = [local.airlock_notifications_subnet_address_prefix]
-    private_endpoint_network_policies = "Disabled"
-    security_group                    = azurerm_network_security_group.default_rules.id
+resource "azurerm_subnet_network_security_group_association" "airlock_notification" {
+  subnet_id                 = azurerm_subnet.airlock_notification.id
+  network_security_group_id = azurerm_network_security_group.default_rules.id
+}
 
-    delegation {
-      name = "delegation"
+resource "azurerm_subnet" "airlock_storage" {
+  name                              = "AirlockStorageSubnet"
+  resource_group_name               = var.resource_group_name
+  virtual_network_name              = azurerm_virtual_network.core.name
+  address_prefixes                  = [local.airlock_storage_subnet_address_prefix]
+  private_endpoint_network_policies = "Disabled"
+}
 
-      service_delegation {
-        name    = "Microsoft.Web/serverFarms"
-        actions = ["Microsoft.Network/virtualNetworks/subnets/action"]
-      }
-    }
-    service_endpoints = ["Microsoft.ServiceBus"]
-  }
+resource "azurerm_subnet_network_security_group_association" "airlock_storage" {
+  subnet_id                 = azurerm_subnet.airlock_storage.id
+  network_security_group_id = azurerm_network_security_group.default_rules.id
+}
 
-  subnet {
-    name                              = "AirlockStorageSubnet"
-    address_prefixes                  = [local.airlock_storage_subnet_address_prefix]
-    private_endpoint_network_policies = "Disabled"
-    security_group                    = azurerm_network_security_group.default_rules.id
-    route_table_id                    = azurerm_route_table.rt.id
-  }
+resource "azurerm_subnet_route_table_association" "airlock_storage" {
+  subnet_id      = azurerm_subnet.airlock_storage.id
+  route_table_id = azurerm_route_table.rt.id
+}
 
-  subnet {
-    name                              = "AirlockEventsSubnet"
-    address_prefixes                  = [local.airlock_events_subnet_address_prefix]
-    private_endpoint_network_policies = "Disabled"
-    security_group                    = azurerm_network_security_group.default_rules.id
-    route_table_id                    = azurerm_route_table.rt.id
+resource "azurerm_subnet" "airlock_events" {
+  name                              = "AirlockEventsSubnet"
+  resource_group_name               = var.resource_group_name
+  virtual_network_name              = azurerm_virtual_network.core.name
+  address_prefixes                  = [local.airlock_events_subnet_address_prefix]
+  private_endpoint_network_policies = "Disabled"
 
-    service_endpoints = ["Microsoft.ServiceBus"]
-  }
+  service_endpoints = ["Microsoft.ServiceBus"]
+}
 
-  subnet {
-    name             = "AzureFirewallManagementSubnet"
-    address_prefixes = [local.firewall_management_subnet_address_prefix]
-  }
+resource "azurerm_subnet_network_security_group_association" "airlock_events" {
+  subnet_id                 = azurerm_subnet.airlock_events.id
+  network_security_group_id = azurerm_network_security_group.default_rules.id
+}
+
+resource "azurerm_subnet_route_table_association" "airlock_events" {
+  subnet_id      = azurerm_subnet.airlock_events.id
+  route_table_id = azurerm_route_table.rt.id
+}
+
+resource "azurerm_subnet" "firewall_management" {
+  name                 = "AzureFirewallManagementSubnet"
+  resource_group_name  = var.resource_group_name
+  virtual_network_name = azurerm_virtual_network.core.name
+  address_prefixes     = [local.firewall_management_subnet_address_prefix]
 }
 
 resource "azurerm_ip_group" "resource_processor" {
