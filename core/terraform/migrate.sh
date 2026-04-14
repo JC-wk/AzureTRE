@@ -98,69 +98,6 @@ terraform refresh
 # get TF state in JSON
 terraform_show_json=$(terraform show -json)
 
-# List of resource addresses to remove.
-declare -a RESOURCES_TO_REMOVE=(
-  "module.network.azurerm_subnet_network_security_group_association.bastion"
-  "module.network.azurerm_subnet_network_security_group_association.app_gw"
-  "module.network.azurerm_subnet_network_security_group_association.shared"
-  "module.network.azurerm_subnet_network_security_group_association.web_app"
-  "module.network.azurerm_subnet_network_security_group_association.resource_processor"
-  "module.network.azurerm_subnet_network_security_group_association.airlock_processor"
-  "module.network.azurerm_subnet_network_security_group_association.airlock_notification"
-  "module.network.azurerm_subnet_network_security_group_association.airlock_storage"
-  "module.network.azurerm_subnet_network_security_group_association.airlock_events"
-  "module.network.azurerm_subnet.bastion"
-  "module.network.azurerm_subnet.azure_firewall"
-  "module.network.azurerm_subnet.app_gw"
-  "module.network.azurerm_subnet.web_app"
-  "module.network.azurerm_subnet.shared"
-  "module.network.azurerm_subnet.resource_processor"
-  "module.network.azurerm_subnet.airlock_processor"
-  "module.network.azurerm_subnet.airlock_notification"
-  "module.network.azurerm_subnet.airlock_storage"
-  "module.network.azurerm_subnet.airlock_events"
-  "module.network.azurerm_subnet.firewall_management"
-)
-vnet_address="module.network.azurerm_virtual_network.core"
-
-# Check if migration is needed
-migration_needed=0
-for resource in "${RESOURCES_TO_REMOVE[@]}"; do
-  resource_id=$(get_resource_id "${terraform_show_json}" "$resource")
-  if [ -n "$resource_id" ] && [ "$resource_id" != "null" ]; then
-    migration_needed=1
-    break
-  fi
-done
-
-# Remove old resources
-if [ "$migration_needed" -eq 1 ]; then
-  for resource in "${RESOURCES_TO_REMOVE[@]}"; do
-    resource_id=$(get_resource_id "${terraform_show_json}" "$resource")
-    if [ -n "$resource_id" ] && [ "$resource_id" != "null" ]; then
-      terraform state rm "$resource"
-    else
-      echo "Resource that was supposed to be removed not found in state: ${resource}"
-    fi
-  done
-
-  # Remove and re-import the VNet
-  vnet_address="module.network.azurerm_virtual_network.core"
-  vnet_id=$(get_resource_id "${terraform_show_json}" "$vnet_address" "vnet")
-  if [ -n "${vnet_id}" ] && [ "${vnet_id}" != "null" ]; then
-    terraform state rm "${vnet_address}"
-    terraform import "${vnet_address}" "${vnet_id}"
-  else
-    echo "VNet resource not found in state: ${vnet_address}"
-  fi
-  echo "*** Migration Done ***"
-else
-  echo "No old resources found in the state, skipping migration."
-  echo "*** Migration Skipped ***"
-fi
-
-
-
 # Remove the firewall adn other resources from the shared service state and import it into the core state.
 # https://github.com/microsoft/AzureTRE/pull/4342
 echo "REMOVING STATE FOR FIREWALL..."
