@@ -142,14 +142,23 @@ it("handles async operations", async () => {
 ### Development Commands
 
 ```bash
-# Run tests in watch mode
+# Change directory
+cd ui/app
+
+# Run tests in watch mode (waits for file changes)
 npm test
 
-# Run tests once with coverage
+# Run tests in run mode
+npm test --run
+
+# Run tests and produces a coverage report
 npm run test:coverage
 
+# Launches a web page where you can visualise your tests
+npm run test:ui
+
 # Build and test (CI)
-npm run build && npm test
+npm run build && npm test --run
 ```
 
 ### Test Scripts

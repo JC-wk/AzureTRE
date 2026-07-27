@@ -2,7 +2,6 @@ import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { UserMenu } from "./UserMenu";
-import { createAuthMocks } from "../../test-utils/common-mocks";
 
 // Mock MSAL
 const mockLogout = vi.fn();
@@ -14,57 +13,60 @@ const mockAccount = {
   tenantId: "test-tenant-id",
   localAccountId: "test-local-account-id",
 };
+let mockAccounts = [mockAccount];
+let mockCurrentAccount: typeof mockAccount | null = mockAccount;
 
 vi.mock("@azure/msal-react", () => ({
   useMsal: () => ({
     instance: {
       logout: mockLogout,
     },
-    accounts: [mockAccount],
+    accounts: mockAccounts,
   }),
-  useAccount: () => mockAccount,
+  useAccount: () => mockCurrentAccount,
 }));
 
 // Mock FluentUI components
-vi.mock("@fluentui/react", () => ({
-  PrimaryButton: ({ children, menuProps, onClick, style }: any) => (
+vi.mock("@fluentui/react", () => {
+  const PrimaryButton = ({ children, menuProps, onClick, style }: any) => (
     <>
-      <button
-        data-testid="primary-button"
-        onClick={onClick}
-        style={style}
-        data-menu={menuProps ? "true" : "false"}
-      >
+      <button data-testid="primary-button" onClick={onClick} style={style} data-menu={menuProps ? "true" : "false"}>
         {children}
       </button>
       {menuProps && (
         <div data-testid="menu-items">
           {menuProps.items.map((item: any) => (
-            <button
-              key={item.key}
-              data-testid={`menu-item-${item.key}`}
-              onClick={item.onClick}
-            >
+            <button key={item.key} data-testid={`menu-item-${item.key}`} onClick={item.onClick}>
               {item.text}
             </button>
           ))}
         </div>
       )}
     </>
-  ),
-  Persona: ({ text, size, imageAlt }: any) => (
+  );
+  PrimaryButton.displayName = "PrimaryButton";
+
+  const Persona = ({ text, size, imageAlt }: any) => (
     <div data-testid="persona" data-size={size} data-alt={imageAlt}>
       {text}
     </div>
-  ),
-  PersonaSize: {
-    size32: "size32",
-  }
-}));
+  );
+  Persona.displayName = "Persona";
+
+  return {
+    PrimaryButton,
+    Persona,
+    PersonaSize: {
+      size32: "size32",
+    },
+  };
+});
 
 describe("UserMenu Component", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockAccounts = [mockAccount];
+    mockCurrentAccount = mockAccount;
   });
 
   it("renders user menu with persona", () => {
@@ -133,19 +135,8 @@ describe("UserMenu Component", () => {
   });
 
   it("handles no account gracefully", () => {
-    // For this specific test, we need to manually restore and re-mock MSAL
-    vi.restoreAllMocks();
-
-    // Create new mock for no account scenario
-    vi.mock("@azure/msal-react", () => ({
-      useMsal: () => ({
-        instance: {
-          logout: mockLogout,
-        },
-        accounts: [],
-      }),
-      useAccount: () => null,
-    }));
+    mockAccounts = [];
+    mockCurrentAccount = null;
 
     render(<UserMenu />);
 

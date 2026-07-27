@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom";
-import { expect, beforeAll, vi } from "vitest";
+import { beforeAll, vi } from "vitest";
 import React from "react";
 
 // Mock MSAL React globally to avoid real provider state updates during tests
@@ -8,12 +8,13 @@ vi.mock("@azure/msal-react", () => {
 
   return {
     MsalProvider: ({ children }: { children: React.ReactNode }) => React.createElement(React.Fragment, null, children),
-    MsalAuthenticationTemplate: ({ children }: { children: React.ReactNode }) => React.createElement(React.Fragment, null, children),
+    MsalAuthenticationTemplate: ({ children }: { children: React.ReactNode }) =>
+      React.createElement(React.Fragment, null, children),
     useMsal: () => ({
       instance: {
         acquireTokenSilent: async () => ({ accessToken: "test-token" }),
         acquireTokenPopup: async () => ({ accessToken: "test-token" }),
-        logout: async () => { },
+        logout: async () => {},
       },
       accounts: [],
     }),
@@ -55,7 +56,7 @@ beforeAll(() => {
   // Mock crypto for MSAL
   Object.defineProperty(global, "crypto", {
     value: {
-      getRandomValues: (arr: any) => {
+      getRandomValues: (arr: Uint8Array) => {
         for (let i = 0; i < arr.length; i++) {
           arr[i] = Math.floor(Math.random() * 256);
         }
@@ -99,7 +100,7 @@ beforeAll(() => {
         // Add other commonly used icons as needed
       },
     });
-  } catch (e) {
+  } catch (_e) {
     // Ignore if @fluentui/react is not available
   }
 });

@@ -14,11 +14,7 @@ import React, { useContext, useState, useEffect, useRef } from "react";
 import { AvailableUpgrade, Resource } from "../../models/resource";
 import { ApiEndpoint } from "../../models/apiEndpoints";
 import { WorkspaceService } from "../../models/workspaceService";
-import {
-  HttpMethod,
-  ResultType,
-  useAuthApiCall,
-} from "../../hooks/useAuthApiCall";
+import { HttpMethod, ResultType, useAuthApiCall } from "../../hooks/useAuthApiCall";
 import { WorkspaceContext } from "../../contexts/WorkspaceContext";
 import { ResourceType } from "../../models/resourceType";
 import { APIError } from "../../models/exceptions";
@@ -39,7 +35,7 @@ const getAllPropertyKeys = (properties: any, prefix = ""): string[] => {
   if (!properties) return [];
   let keys: string[] = [];
   for (const [key, value] of Object.entries(properties)) {
-    if (value && typeof value === "object" && 'properties' in value) {
+    if (value && typeof value === "object" && "properties" in value) {
       // recur for nested properties
       keys = keys.concat(getAllPropertyKeys(value["properties"], prefix + key + "."));
     } else {
@@ -57,7 +53,7 @@ const buildReducedSchema = (fullSchema: any, keys: string[]): any => {
 
   keys.forEach((key) => {
     // Only allow top-level property keys (no nested with dots) for simplicity here
-    const topKey = key.split('.')[0];
+    const topKey = key.split(".")[0];
     if (fullSchema.properties[topKey]) {
       if (!reducedProperties[topKey]) {
         reducedProperties[topKey] = fullSchema.properties[topKey];
@@ -99,7 +95,7 @@ const extractConditionalBlocks = (schema: any, newKeys: string[]) => {
     if (entry && entry.if) {
       const conditionalKeys = collectConditionalKeys(entry);
       // include entry if any conditionalKey matches a new key (top-level match)
-      if (conditionalKeys.some((k) => newKeys.some((nk) => nk.split('.')[0] === k))) {
+      if (conditionalKeys.some((k) => newKeys.some((nk) => nk.split(".")[0] === k))) {
         conditionalEntries.push(entry);
       }
     }
@@ -107,15 +103,11 @@ const extractConditionalBlocks = (schema: any, newKeys: string[]) => {
   return { allOf: conditionalEntries };
 };
 
-export const ConfirmUpgradeResource: React.FunctionComponent<
-  ConfirmUpgradeProps
-> = (props: ConfirmUpgradeProps) => {
+export const ConfirmUpgradeResource: React.FunctionComponent<ConfirmUpgradeProps> = (props: ConfirmUpgradeProps) => {
   const apiCall = useAuthApiCall();
   const [selectedVersion, setSelectedVersion] = useState("");
   const [apiError, setApiError] = useState<APIError | null>(null);
-  const [requestLoadingState, setRequestLoadingState] = useState(
-    LoadingState.Ok,
-  );
+  const [requestLoadingState, setRequestLoadingState] = useState(LoadingState.Ok);
   const workspaceCtx = useContext(WorkspaceContext);
   const dispatch = useAppDispatch();
 
@@ -184,16 +176,13 @@ export const ConfirmUpgradeResource: React.FunctionComponent<
       case ResourceType.UserResource:
         if (props.resource.properties.parentWorkspaceService) {
           // If we are upgrading a user resource, parent resource must have a workspaceId
-          const workspaceId = (props.resource.properties.parentWorkspaceService as WorkspaceService)
-            .workspaceId;
+          const workspaceId = (props.resource.properties.parentWorkspaceService as WorkspaceService).workspaceId;
           templateListPath = `${ApiEndpoint.Workspaces}/${workspaceId}/${ApiEndpoint.WorkspaceServiceTemplates}/${props.resource.properties.parentWorkspaceService.templateName}/${ApiEndpoint.UserResourceTemplates}`;
           templateGetPath = `${ApiEndpoint.WorkspaceServiceTemplates}/${props.resource.properties.parentWorkspaceService.templateName}/${ApiEndpoint.UserResourceTemplates}`;
           // workspaceApplicationIdURI = props.resource.properties.parentWorkspaceService.workspaceApplicationIdURI;
           break;
         } else {
-          throw Error(
-            "Parent workspace service must be passed as prop when creating user resource.",
-          );
+          throw Error("Parent workspace service must be passed as prop when creating user resource.");
         }
       default:
         throw Error("Unsupported resource type.");
@@ -247,9 +236,9 @@ export const ConfirmUpgradeResource: React.FunctionComponent<
         setNewPropertyValues(
           newPropKeys.reduce((acc, key) => {
             // Get top-level portion of the key
-            const topKey = key.split('.')[0];
+            const topKey = key.split(".")[0];
             const defaultValue = newTemplate?.properties?.[topKey]?.default;
-            acc[key] = defaultValue !== undefined ? defaultValue : '';
+            acc[key] = defaultValue !== undefined ? defaultValue : "";
             return acc;
           }, {} as any),
         );
@@ -295,17 +284,13 @@ export const ConfirmUpgradeResource: React.FunctionComponent<
   };
 
   // Use buildReducedSchema to include only new properties
-  const reducedSchemaProperties = newTemplateSchema
-    ? buildReducedSchema(newTemplateSchema, newPropertiesToFill)
-    : null;
+  const reducedSchemaProperties = newTemplateSchema ? buildReducedSchema(newTemplateSchema, newPropertiesToFill) : null;
 
   // Extract any conditional blocks from full schema, filtered by new properties
   const conditionalBlocks = newTemplateSchema ? extractConditionalBlocks(newTemplateSchema, newPropertiesToFill) : {};
 
   // Compose final schema combining reduced properties with conditional blocks
-  const finalSchema = reducedSchemaProperties
-    ? { ...reducedSchemaProperties, ...conditionalBlocks }
-    : null;
+  const finalSchema = reducedSchemaProperties ? { ...reducedSchemaProperties, ...conditionalBlocks } : null;
 
   // UI schema override: hide the form's submit button because we use external Upgrade button
   // start with existing UI order and classNames from full schema uiSchema
@@ -343,9 +328,7 @@ export const ConfirmUpgradeResource: React.FunctionComponent<
 
   const getDropdownOptions = () => {
     const options = [];
-    const nonMajorUpgrades = props.resource.availableUpgrades.filter(
-      (upgrade) => !upgrade.forceUpdateRequired,
-    );
+    const nonMajorUpgrades = props.resource.availableUpgrades.filter((upgrade) => !upgrade.forceUpdateRequired);
     options.push(...convertToDropDownOptions(nonMajorUpgrades));
     return options;
   };
@@ -367,7 +350,8 @@ export const ConfirmUpgradeResource: React.FunctionComponent<
             {loadingSchema && <Spinner label="Loading new template schema..." />}
             {!loadingSchema && removedProperties.length > 0 && (
               <MessageBar messageBarType={MessageBarType.warning}>
-                Warning: The following properties are no longer present in the template and will be removed: {removedProperties.join(', ')}
+                Warning: The following properties are no longer present in the template and will be removed:{" "}
+                {removedProperties.join(", ")}
               </MessageBar>
             )}
             {!loadingSchema && newPropertiesToFill.length > 0 && (
@@ -405,9 +389,7 @@ export const ConfirmUpgradeResource: React.FunctionComponent<
                 primaryDisabled={
                   !selectedVersion ||
                   (newPropertiesToFill.length > 0 &&
-                    Object.values(newPropertyValues).some(
-                      (v) => v === "" || v === undefined,
-                    ))
+                    Object.values(newPropertyValues).some((v) => v === "" || v === undefined))
                 }
                 text="Upgrade"
                 onClick={() => upgradeCall()}
@@ -416,15 +398,9 @@ export const ConfirmUpgradeResource: React.FunctionComponent<
           </>
         )}
         {requestLoadingState === LoadingState.Loading && (
-          <Spinner
-            label="Sending request..."
-            ariaLive="assertive"
-            labelPosition="right"
-          />
+          <Spinner label="Sending request..." ariaLive="assertive" labelPosition="right" />
         )}
-        {requestLoadingState === LoadingState.Error && (
-          <ExceptionLayout e={apiError ?? ({} as APIError)} />
-        )}
+        {requestLoadingState === LoadingState.Error && <ExceptionLayout e={apiError ?? ({} as APIError)} />}
       </Dialog>
     </>
   );

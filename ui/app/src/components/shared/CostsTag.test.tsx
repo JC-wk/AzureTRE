@@ -1,12 +1,6 @@
 import React from "react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import {
-  render,
-  screen,
-  waitFor,
-  createAuthApiCallMock,
-  createApiEndpointsMock
-} from "../../test-utils";
+import { describe, it, expect, vi, beforeEach, Mock } from "vitest";
+import { render, screen, waitFor, createAuthApiCallMock, createApiEndpointsMock } from "../../test-utils";
 import { createCompleteFluentUIMock } from "../../test-utils/fluentui-mocks";
 import { CostsTag } from "./CostsTag";
 import { CostsContext } from "../../contexts/CostsContext";
@@ -56,21 +50,20 @@ const mockWorkspace = {
     name: "Test User",
     email: "test@example.com",
     roleAssignments: [],
-    roles: ["workspace_owner"],
+    roles: ["workspace_researcher"],
   },
   workspaceURL: "https://workspace.example.com",
 };
 
-
 const createMockCostsContext = (costs?: CostResource[]) => ({
-  costs,
+  costs: costs || [],
   loadingState: LoadingState.Ok,
   setCosts: vi.fn(),
   setLoadingState: vi.fn(),
 });
 
 const createMockWorkspaceContext = (costs?: CostResource[]) => ({
-  costs,
+  costs: costs || [],
   workspace: mockWorkspace,
   workspaceApplicationIdURI: "test-app-id-uri",
   roles: ["workspace_researcher"],
@@ -89,16 +82,14 @@ const renderWithContexts = (
 
   return render(
     <CostsContext.Provider value={costsContext as any}>
-      <WorkspaceContext.Provider value={workspaceContext as any}>
-        {component}
-      </WorkspaceContext.Provider>
-    </CostsContext.Provider>
+      <WorkspaceContext.Provider value={workspaceContext as any}>{component}</WorkspaceContext.Provider>
+    </CostsContext.Provider>,
   );
 };
 
 describe("CostsTag Component", () => {
   // Get a reference to the mock API call function
-  const mockApiCall = (globalThis as any).__mockApiCall;
+  const mockApiCall = (globalThis as any).__mockApiCall as Mock;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -110,14 +101,18 @@ describe("CostsTag Component", () => {
     const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
     mockApiCall.mockImplementation(async () => {
       await delay(100);
-      return { workspaceAuth: { scopeId: "scope" }, costs: [{ cost: 123.45, currency: "USD" }], id: "resource1", name: "Resource 1" };
+      return {
+        workspaceAuth: { scopeId: "scope" },
+        costs: [{ cost: 123.45, currency: "USD" }],
+        id: "resource1",
+        name: "Resource 1",
+      };
     });
-
 
     // Provide a workspace with id: undefined to trigger loading state
     const workspaceWithNoId = { ...mockWorkspace, id: undefined };
     const workspaceContext = {
-      costs: undefined,
+      costs: [],
       workspace: workspaceWithNoId,
       workspaceApplicationIdURI: "test-app-id-uri",
       roles: ["workspace_researcher"],
@@ -126,7 +121,7 @@ describe("CostsTag Component", () => {
       setWorkspace: vi.fn(),
     } as any;
     const costsContext = {
-      costs: undefined,
+      costs: [],
       loadingState: LoadingState.Loading,
       setCosts: vi.fn(),
       setLoadingState: vi.fn(),
@@ -136,7 +131,7 @@ describe("CostsTag Component", () => {
         <WorkspaceContext.Provider value={workspaceContext}>
           <CostsTag resourceId="resource1" />
         </WorkspaceContext.Provider>
-      </CostsContext.Provider>
+      </CostsContext.Provider>,
     );
 
     // Wait for shimmer to appear (async)

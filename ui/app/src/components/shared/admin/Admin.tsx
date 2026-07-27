@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { Stack, DefaultButton } from '@fluentui/react';
-import Operations from './Operations';
-import Templates from './Templates';
+import React, { useState } from "react";
+import { Stack, DefaultButton } from "@fluentui/react";
+import Operations from "./Operations";
+import Templates from "./Templates";
 
 const Admin: React.FC = () => {
   const [showOperations, setShowOperations] = useState(false);
@@ -10,7 +10,9 @@ const Admin: React.FC = () => {
   return (
     <Stack className="tre-panel">
       <h1>Admin</h1>
-      <p style={{ color: 'Orange' }}>Warning: These admin functions are advanced and experimental, proceed with caution.</p>
+      <p style={{ color: "Orange" }}>
+        Warning: These admin functions are advanced and experimental, proceed with caution.
+      </p>
 
       {!showOperations && !showTemplates && (
         <Stack horizontal tokens={{ childrenGap: 12 }} styles={{ root: { marginTop: 10 } }}>

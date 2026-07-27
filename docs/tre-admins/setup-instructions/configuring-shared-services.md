@@ -2,7 +2,7 @@
 
 In general, a shared service should be installed by using the UI or API directly once its bundle has been registered on the system.
 
-As part of this quickstart, you will need to install the Nexus shared service, as you will be subsequently deploying Guacamole VMs that depend on public package respositories to bootstrap. Due to the TRE's Firewall blocking public access, Nexus will proxy these package repositories and make them available within the TRE for the VMs to consume.
+As part of this quickstart, you will need to install the Nexus shared service, as you will be subsequently deploying Guacamole VMs that depend on public package repositories to bootstrap. Due to the TRE's Firewall blocking public access, Nexus will proxy these package repositories and make them available within the TRE for the VMs to consume.
 
 ## Deploy & configure Nexus service
 
@@ -48,7 +48,7 @@ You can optionally go to the Nexus web interface by visiting `https://nexus-{TRE
 
 Just bear in mind that if this service is redeployed any changes made in the Nexus UI won't be persisted. If you wish to permanently add new repositories or alter existing ones, modify the JSON files within the `./nexus_repos_config` directory and redeploy.
 
-You can view further information on the Nexus shared service [here](../../tre-templates/shared-services/nexus.md).
+You can view further information on the [Nexus shared service documentation](../../tre-templates/shared-services/nexus.md).
 
 ## (Optional) Install Gitea and configure repositories
 
@@ -88,7 +88,7 @@ From a virtual machine within a workspace:
 - Command line: ```git clone https://gitea-<TRE_ID>.azurewebsites.net/giteaadmin/<NameOfrepository>```
 - Gitea Web Interface: ```https://gitea-<TRE_ID>.azurewebsites.net/```
 
-More info on the Gitea shared service is available [here](../../tre-templates/shared-services/gitea.md).
+More info on the Gitea shared service is available in the [Gitea shared service documentation](../../tre-templates/shared-services/gitea.md).
 
 ## Next steps
 
