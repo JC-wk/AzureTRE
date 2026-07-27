@@ -1,9 +1,16 @@
 import React, { useEffect, useState } from "react";
-import { Stack, DefaultButton, PrimaryButton, Spinner, TooltipHost, DirectionalHint } from "@fluentui/react";
+import {
+  Stack,
+  DefaultButton,
+  PrimaryButton,
+  Spinner,
+  TooltipHost,
+  DirectionalHint,
+  SearchBox,
+  Icon,
+} from "@fluentui/react";
 import { useAuthApiCall, HttpMethod, ResultType } from "../../../hooks/useAuthApiCall";
 import semver from "semver";
-import { Workspace } from "../../../models/workspace";
-import { SharedService } from "../../../models/sharedService";
 import { ResourceType } from "../../../models/resourceType";
 
 interface Template {
@@ -28,10 +35,27 @@ interface TemplatesProps {
   onClose: () => void;
 }
 
+const getResourceTypeColor = (type: string) => {
+  switch (type.toLowerCase()) {
+    case ResourceType.Workspace.toLowerCase():
+      return { bg: "#eff6fc", border: "#0078d4", text: "#0078d4" };
+    case ResourceType.WorkspaceService.toLowerCase():
+      return { bg: "#f3f2f1", border: "#5c2d91", text: "#5c2d91" };
+    case ResourceType.UserResource.toLowerCase():
+      return { bg: "#f0fdf4", border: "#166534", text: "#166534" };
+    case ResourceType.SharedService.toLowerCase():
+      return { bg: "#fff7ed", border: "#c2410c", text: "#c2410c" };
+    default:
+      return { bg: "#f3f2f1", border: "#605e5c", text: "#605e5c" };
+  }
+};
+
 const Templates: React.FC<TemplatesProps> = ({ onClose }) => {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [inUseTemplates, setInUseTemplates] = useState<Map<string, TemplateUsage[]>>(new Map());
   const [loading, setLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedResourceType, setSelectedResourceType] = useState<string>("all");
   const api = useAuthApiCall();
 
   const getTemplateVersionKey = (name: string, version: string) => `${name}::${version}`;
@@ -108,8 +132,22 @@ const Templates: React.FC<TemplatesProps> = ({ onClose }) => {
     }
   };
 
+  // Filter templates based on search & resource type
+  const filteredTemplates = templates.filter((template) => {
+    const matchesSearch =
+      searchQuery === "" ||
+      template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (template.title && template.title.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (template.description && template.description.toLowerCase().includes(searchQuery.toLowerCase()));
+
+    const matchesType =
+      selectedResourceType === "all" || template.resourceType.toLowerCase() === selectedResourceType.toLowerCase();
+
+    return matchesSearch && matchesType;
+  });
+
   // Group templates by name and resource type
-  const groupedTemplates = templates.reduce(
+  const groupedTemplates = filteredTemplates.reduce(
     (acc, template) => {
       const key = `${template.name}-${template.resourceType}`;
       if (!acc[key]) {
@@ -121,34 +159,150 @@ const Templates: React.FC<TemplatesProps> = ({ onClose }) => {
     {} as Record<string, Template[]>,
   );
 
+  const totalFamiliesCount = Object.keys(groupedTemplates).length;
+  const inUseCount = templates.filter((t) => inUseTemplates.has(getTemplateVersionKey(t.name, t.version))).length;
+
   return (
-    <Stack className="tre-panel tre-resource-panel">
+    <Stack className="tre-panel tre-resource-panel" tokens={{ childrenGap: 16 }}>
+      {/* Header */}
       <Stack horizontal horizontalAlign="space-between" verticalAlign="center">
-        <h2 style={{ margin: 0 }}>Template Management</h2>
-        <DefaultButton text="Close" onClick={onClose} />
+        <div>
+          <h2
+            style={{ margin: 0, fontSize: "22px", fontWeight: 600, display: "flex", alignItems: "center", gap: "8px" }}
+          >
+            <Icon iconName="PageList" style={{ color: "#0078d4" }} /> Template Management
+          </h2>
+        </div>
+        <DefaultButton text="Close" onClick={onClose} iconProps={{ iconName: "Cancel" }} />
       </Stack>
 
       <p style={{ color: "Orange", marginTop: 10 }}>
         Warning: Deleting templates is permanent and cannot be undone. Ensure no resources are using these templates.
       </p>
 
+      {/* KPI Stats Bar */}
+      {!loading && templates.length > 0 && (
+        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginBottom: "8px" }}>
+          <div
+            style={{
+              background: "#f3f2f1",
+              padding: "10px 16px",
+              borderRadius: "6px",
+              flex: "1 1 180px",
+              borderLeft: "4px solid #0078d4",
+            }}
+          >
+            <div style={{ fontSize: "12px", color: "#605e5c" }}>Registered Template Families</div>
+            <div style={{ fontSize: "20px", fontWeight: 600, color: "#323130" }}>{totalFamiliesCount}</div>
+          </div>
+          <div
+            style={{
+              background: "#f3f2f1",
+              padding: "10px 16px",
+              borderRadius: "6px",
+              flex: "1 1 180px",
+              borderLeft: "4px solid #107c41",
+            }}
+          >
+            <div style={{ fontSize: "12px", color: "#605e5c" }}>Total Registered Versions</div>
+            <div style={{ fontSize: "20px", fontWeight: 600, color: "#323130" }}>{templates.length}</div>
+          </div>
+          <div
+            style={{
+              background: "#f3f2f1",
+              padding: "10px 16px",
+              borderRadius: "6px",
+              flex: "1 1 180px",
+              borderLeft: "4px solid #d97706",
+            }}
+          >
+            <div style={{ fontSize: "12px", color: "#605e5c" }}>Versions In Use</div>
+            <div style={{ fontSize: "20px", fontWeight: 600, color: "#323130" }}>{inUseCount}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Search & Filter Toolbar */}
+      {!loading && templates.length > 0 && (
+        <Stack
+          horizontal
+          horizontalAlign="space-between"
+          verticalAlign="center"
+          tokens={{ childrenGap: 12 }}
+          style={{ flexWrap: "wrap" }}
+        >
+          <SearchBox
+            placeholder="Filter templates by name or description..."
+            value={searchQuery}
+            onChange={(_, newValue) => setSearchQuery(newValue || "")}
+            onClear={() => setSearchQuery("")}
+            styles={{ root: { width: 320 } }}
+          />
+
+          <Stack horizontal tokens={{ childrenGap: 6 }}>
+            {[
+              "all",
+              ResourceType.Workspace,
+              ResourceType.WorkspaceService,
+              ResourceType.UserResource,
+              ResourceType.SharedService,
+            ].map((type) => (
+              <button
+                key={type}
+                onClick={() => setSelectedResourceType(type)}
+                style={{
+                  border: "none",
+                  borderRadius: "16px",
+                  padding: "4px 12px",
+                  fontSize: "12px",
+                  fontWeight: selectedResourceType === type ? 600 : 400,
+                  backgroundColor: selectedResourceType === type ? "#0078d4" : "#f3f2f1",
+                  color: selectedResourceType === type ? "#ffffff" : "#323130",
+                  cursor: "pointer",
+                  transition: "all 0.15s ease-in-out",
+                }}
+              >
+                {type === "all" ? "All Types" : type}
+              </button>
+            ))}
+          </Stack>
+        </Stack>
+      )}
+
       {loading && <Spinner label="Loading templates..." />}
 
       {!loading && templates.length === 0 && <div style={{ marginTop: 20 }}>No templates found.</div>}
 
-      {!loading && templates.length > 0 && (
+      {!loading && templates.length > 0 && filteredTemplates.length === 0 && (
+        <div style={{ marginTop: 20, color: "#605e5c", textAlign: "center", padding: "20px" }}>
+          No templates match your search filter criteria.
+        </div>
+      )}
+
+      {!loading && filteredTemplates.length > 0 && (
         <div style={{ overflowX: "auto", marginTop: 10 }}>
           {Object.entries(groupedTemplates).map(([key, templateVersions]) => {
             const firstTemplate = templateVersions[0];
             const isAnyVersionInUse = templateVersions.some((v) =>
               inUseTemplates.has(getTemplateVersionKey(v.name, v.version)),
             );
+            const typeStyle = getResourceTypeColor(firstTemplate.resourceType);
 
             return (
-              <div key={key} style={{ marginBottom: 30 }}>
-                <Stack horizontal horizontalAlign="space-between" verticalAlign="center" style={{ marginBottom: 10 }}>
+              <div
+                key={key}
+                style={{
+                  marginBottom: 24,
+                  border: "1px solid #e1dfdd",
+                  borderRadius: "8px",
+                  padding: "16px",
+                  backgroundColor: "#ffffff",
+                  boxShadow: "0 2px 4px rgba(0,0,0,0.02)",
+                }}
+              >
+                <Stack horizontal horizontalAlign="space-between" verticalAlign="center" style={{ marginBottom: 14 }}>
                   <div>
-                    <h3 style={{ margin: 0, display: "flex", alignItems: "center" }}>
+                    <h3 style={{ margin: 0, display: "flex", alignItems: "center", fontSize: "16px", fontWeight: 600 }}>
                       {firstTemplate.title || firstTemplate.name}
                       {isAnyVersionInUse && (
                         <span
@@ -165,11 +319,28 @@ const Templates: React.FC<TemplatesProps> = ({ onClose }) => {
                         </span>
                       )}
                     </h3>
-                    <div style={{ fontSize: "12px", color: "#666" }}>
-                      {firstTemplate.name} ({firstTemplate.resourceType})
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px" }}>
+                      <span style={{ fontSize: "12px", fontFamily: "monospace", color: "#605e5c" }}>
+                        {firstTemplate.name}
+                      </span>
+                      <span
+                        style={{
+                          backgroundColor: typeStyle.bg,
+                          color: typeStyle.text,
+                          border: `1px solid ${typeStyle.border}30`,
+                          borderRadius: "12px",
+                          padding: "2px 8px",
+                          fontSize: "11px",
+                          fontWeight: 500,
+                        }}
+                      >
+                        {firstTemplate.resourceType}
+                      </span>
                     </div>
                     {firstTemplate.description && (
-                      <div style={{ fontSize: "13px", marginTop: 5 }}>{firstTemplate.description}</div>
+                      <div style={{ fontSize: "13px", marginTop: 6, color: "#605e5c" }}>
+                        {firstTemplate.description}
+                      </div>
                     )}
                   </div>
                   <PrimaryButton
@@ -183,13 +354,19 @@ const Templates: React.FC<TemplatesProps> = ({ onClose }) => {
                   />
                 </Stack>
 
-                <table className="tre-table">
+                <table className="tre-table" style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead>
-                    <tr>
-                      <th>Version</th>
-                      <th>Current</th>
-                      <th>ID</th>
-                      <th>Actions</th>
+                    <tr style={{ backgroundColor: "#faf9f8", borderBottom: "2px solid #edebe9", textAlign: "left" }}>
+                      <th style={{ padding: "8px 12px", fontSize: "12px", fontWeight: 600, color: "#605e5c" }}>
+                        Version
+                      </th>
+                      <th style={{ padding: "8px 12px", fontSize: "12px", fontWeight: 600, color: "#605e5c" }}>
+                        Current
+                      </th>
+                      <th style={{ padding: "8px 12px", fontSize: "12px", fontWeight: 600, color: "#605e5c" }}>ID</th>
+                      <th style={{ padding: "8px 12px", fontSize: "12px", fontWeight: 600, color: "#605e5c" }}>
+                        Actions
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -199,8 +376,8 @@ const Templates: React.FC<TemplatesProps> = ({ onClose }) => {
                         const usage = inUseTemplates.get(getTemplateVersionKey(template.name, template.version));
                         const isVersionInUse = usage && usage.length > 0;
                         return (
-                          <tr key={template.id}>
-                            <td>
+                          <tr key={template.id} style={{ borderBottom: "1px solid #f3f2f1" }}>
+                            <td style={{ padding: "8px 12px" }}>
                               <strong>{template.version}</strong>
                               {isVersionInUse && (
                                 <TooltipHost
@@ -232,15 +409,15 @@ const Templates: React.FC<TemplatesProps> = ({ onClose }) => {
                                 </TooltipHost>
                               )}
                             </td>
-                            <td>
+                            <td style={{ padding: "8px 12px" }}>
                               {template.current ? (
                                 <span style={{ color: "green", fontWeight: "bold" }}>✓ Current</span>
                               ) : (
                                 <span style={{ color: "#666" }}>-</span>
                               )}
                             </td>
-                            <td style={{ fontSize: "11px", color: "#666" }}>{template.id}</td>
-                            <td>
+                            <td style={{ padding: "8px 12px", fontSize: "11px", color: "#666" }}>{template.id}</td>
+                            <td style={{ padding: "8px 12px" }}>
                               <DefaultButton
                                 text="Delete Version"
                                 onClick={() => handleDeleteVersion(template.id, template.name, template.version)}
