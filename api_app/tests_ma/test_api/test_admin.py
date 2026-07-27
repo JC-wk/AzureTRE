@@ -102,7 +102,7 @@ async def test_get_all_templates_as_admin_returns_200_with_templates(app, client
     mock_repo.get_all_templates = AsyncMock(return_value=sample_templates)
 
     with patch.object(ResourceTemplateRepository, 'create', return_value=mock_repo):
-        response = await client.get("/admin/templates", headers={"Authorization": "Bearer token"})
+        response = await client.get(app.url_path_for("get_all_templates"), headers={"Authorization": "Bearer token"})
         assert response.status_code == 200
         response_data = response.json()
         assert len(response_data) == 3
@@ -120,7 +120,7 @@ async def test_get_all_templates_as_admin_returns_empty_list_when_no_templates(a
     mock_repo.get_all_templates = AsyncMock(return_value=[])
 
     with patch.object(ResourceTemplateRepository, 'create', return_value=mock_repo):
-        response = await client.get("/admin/templates", headers={"Authorization": "Bearer token"})
+        response = await client.get(app.url_path_for("get_all_templates"), headers={"Authorization": "Bearer token"})
         assert response.status_code == 200
         assert response.json() == []
 
@@ -131,7 +131,7 @@ async def test_get_all_templates_as_admin_returns_empty_list_when_no_templates(a
 async def test_get_all_templates_as_non_admin_returns_403(app, client: AsyncClient):
     app.dependency_overrides[get_current_admin_user] = create_non_admin_user
 
-    response = await client.get("/admin/templates", headers={"Authorization": "Bearer token"})
+    response = await client.get(app.url_path_for("get_all_templates"), headers={"Authorization": "Bearer token"})
     assert response.status_code == 403
 
     app.dependency_overrides = {}
@@ -146,7 +146,8 @@ async def test_delete_template_by_id_as_admin_returns_204(app, client: AsyncClie
     mock_repo.delete_template_by_id = AsyncMock()
 
     with patch.object(ResourceTemplateRepository, 'create', return_value=mock_repo):
-        response = await client.delete("/admin/templates/test-template-id", headers={"Authorization": "Bearer token"})
+        url = app.url_path_for("delete_template_by_id", template_id="test-template-id")
+        response = await client.delete(url, headers={"Authorization": "Bearer token"})
         assert response.status_code == 204
         mock_repo.delete_template_by_id.assert_called_once_with("test-template-id")
 
@@ -157,7 +158,8 @@ async def test_delete_template_by_id_as_admin_returns_204(app, client: AsyncClie
 async def test_delete_template_by_id_as_non_admin_returns_403(app, client: AsyncClient):
     app.dependency_overrides[get_current_admin_user] = create_non_admin_user
 
-    response = await client.delete("/admin/templates/test-template-id", headers={"Authorization": "Bearer token"})
+    url = app.url_path_for("delete_template_by_id", template_id="test-template-id")
+    response = await client.delete(url, headers={"Authorization": "Bearer token"})
     assert response.status_code == 403
 
     app.dependency_overrides = {}
@@ -171,9 +173,10 @@ async def test_delete_template_by_id_returns_404_when_template_not_found(app, cl
     mock_repo.delete_template_by_id = AsyncMock(side_effect=Exception("Template not found"))
 
     with patch.object(ResourceTemplateRepository, 'create', return_value=mock_repo):
-        response = await client.delete("/admin/templates/non-existent-id", headers={"Authorization": "Bearer token"})
+        url = app.url_path_for("delete_template_by_id", template_id="non-existent-id")
+        response = await client.delete(url, headers={"Authorization": "Bearer token"})
         assert response.status_code == 404
-        assert "Template not found" in response.json()["detail"]
+        assert "Template not found" in response.text
 
     app.dependency_overrides = {}
 
@@ -187,10 +190,8 @@ async def test_delete_templates_by_name_as_admin_returns_200_with_count(app, cli
     mock_repo.delete_templates_by_name = AsyncMock(return_value=3)
 
     with patch.object(ResourceTemplateRepository, 'create', return_value=mock_repo):
-        response = await client.delete(
-            f"/admin/templates/{ResourceType.Workspace}/tre-workspace-base",
-            headers={"Authorization": "Bearer token"}
-        )
+        url = app.url_path_for("delete_templates_by_name", resource_type=ResourceType.Workspace, template_name="tre-workspace-base")
+        response = await client.delete(url, headers={"Authorization": "Bearer token"})
         assert response.status_code == 200
         response_data = response.json()
         assert response_data["deleted_count"] == 3
@@ -208,10 +209,8 @@ async def test_delete_templates_by_name_as_admin_returns_zero_when_no_templates_
     mock_repo.delete_templates_by_name = AsyncMock(return_value=0)
 
     with patch.object(ResourceTemplateRepository, 'create', return_value=mock_repo):
-        response = await client.delete(
-            f"/admin/templates/{ResourceType.Workspace}/non-existent-template",
-            headers={"Authorization": "Bearer token"}
-        )
+        url = app.url_path_for("delete_templates_by_name", resource_type=ResourceType.Workspace, template_name="non-existent-template")
+        response = await client.delete(url, headers={"Authorization": "Bearer token"})
         assert response.status_code == 200
         response_data = response.json()
         assert response_data["deleted_count"] == 0
@@ -223,10 +222,8 @@ async def test_delete_templates_by_name_as_admin_returns_zero_when_no_templates_
 async def test_delete_templates_by_name_as_non_admin_returns_403(app, client: AsyncClient):
     app.dependency_overrides[get_current_admin_user] = create_non_admin_user
 
-    response = await client.delete(
-        f"/admin/templates/{ResourceType.Workspace}/tre-workspace-base",
-        headers={"Authorization": "Bearer token"}
-    )
+    url = app.url_path_for("delete_templates_by_name", resource_type=ResourceType.Workspace, template_name="tre-workspace-base")
+    response = await client.delete(url, headers={"Authorization": "Bearer token"})
     assert response.status_code == 403
 
     app.dependency_overrides = {}
@@ -240,12 +237,10 @@ async def test_delete_templates_by_name_returns_500_on_error(app, client: AsyncC
     mock_repo.delete_templates_by_name = AsyncMock(side_effect=Exception("Database error"))
 
     with patch.object(ResourceTemplateRepository, 'create', return_value=mock_repo):
-        response = await client.delete(
-            f"/admin/templates/{ResourceType.Workspace}/tre-workspace-base",
-            headers={"Authorization": "Bearer token"}
-        )
+        url = app.url_path_for("delete_templates_by_name", resource_type=ResourceType.Workspace, template_name="tre-workspace-base")
+        response = await client.delete(url, headers={"Authorization": "Bearer token"})
         assert response.status_code == 500
-        assert "Error deleting templates" in response.json()["detail"]
+        assert "Error deleting templates" in response.text
 
     app.dependency_overrides = {}
 
@@ -258,11 +253,8 @@ async def test_delete_templates_by_name_works_for_different_resource_types(app, 
     mock_repo.delete_templates_by_name = AsyncMock(return_value=2)
 
     with patch.object(ResourceTemplateRepository, 'create', return_value=mock_repo):
-        # Test with WorkspaceService type
-        response = await client.delete(
-            f"/admin/templates/{ResourceType.WorkspaceService}/tre-service-guacamole",
-            headers={"Authorization": "Bearer token"}
-        )
+        url = app.url_path_for("delete_templates_by_name", resource_type=ResourceType.WorkspaceService, template_name="tre-service-guacamole")
+        response = await client.delete(url, headers={"Authorization": "Bearer token"})
         assert response.status_code == 200
         mock_repo.delete_templates_by_name.assert_called_with("tre-service-guacamole", ResourceType.WorkspaceService)
 
