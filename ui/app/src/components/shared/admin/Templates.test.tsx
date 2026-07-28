@@ -39,8 +39,8 @@ vi.mock("@fluentui/react", async () => {
         {children}
       </div>
     ),
-    DefaultButton: ({ text, onClick, disabled }: any) => (
-      <button data-testid="default-button" onClick={onClick} disabled={disabled}>
+    DefaultButton: ({ text, onClick, disabled, ...rest }: any) => (
+      <button data-testid={rest["data-testid"] || "default-button"} onClick={onClick} disabled={disabled}>
         {text}
       </button>
     ),
@@ -366,5 +366,47 @@ describe("Templates Component", () => {
 
     expect(consoleErrorSpy).toHaveBeenCalledWith("Error fetching templates or usage", expect.any(Error));
     consoleErrorSpy.mockRestore();
+  });
+
+  it("allows deleting unused versions per template family", async () => {
+    mockApiCall.mockImplementation((url: string, method: string) => {
+      if (method === "GET") {
+        if (url === "templates") return Promise.resolve([...mockWorkspaceTemplates, ...mockWorkspaceServiceTemplates]);
+        if (url === "templates/usage")
+          return Promise.resolve([
+            {
+              templateName: "tre-workspace-base",
+              templateVersion: "0.1.0",
+              id: "resource-1",
+              resourceType: ResourceType.Workspace,
+            },
+          ]);
+      }
+      if (method === "DELETE") return Promise.resolve({});
+      return Promise.reject(new Error(`Unexpected API call: ${method} ${url}`));
+    });
+
+    render(<Templates onClose={mockOnClose} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("delete-unused-tre-workspace-base")).toBeInTheDocument();
+    });
+
+    const deleteUnusedButton = screen.getByTestId("delete-unused-tre-workspace-base");
+    expect(deleteUnusedButton).toHaveTextContent("Delete Unused Versions (1)");
+
+    await act(async () => {
+      fireEvent.click(deleteUnusedButton);
+    });
+
+    await waitFor(() => {
+      expect(mockApiCall).toHaveBeenCalledWith(
+        "/templates/template-2-id",
+        "DELETE",
+        undefined,
+        undefined,
+        ResultType.None,
+      );
+    });
   });
 });

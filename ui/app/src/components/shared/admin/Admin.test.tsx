@@ -21,6 +21,15 @@ vi.mock("./Templates", () => ({
   ),
 }));
 
+vi.mock("./UserAccessManagement", () => ({
+  default: ({ onClose }: any) => (
+    <div data-testid="useraccessmanagement-component">
+      <span>User Access Management Component</span>
+      <button onClick={onClose}>Close User Access Management</button>
+    </div>
+  ),
+}));
+
 // Mock FluentUI components
 vi.mock("@fluentui/react", async () => {
   const actual = await vi.importActual("@fluentui/react");
@@ -196,12 +205,35 @@ describe("Admin Component", () => {
     expect(warning).toHaveStyle({ color: "rgb(255, 165, 0)" });
   });
 
-  it("renders main buttons in a horizontal stack", () => {
+  it("displays User & Access Management button initially", () => {
     render(<Admin />);
 
-    const button = screen.getByTestId("button-operations");
-    const buttonStack = button.closest('[data-testid="stack"]');
+    expect(screen.getByTestId("button-user & access management")).toBeInTheDocument();
+  });
 
-    expect(buttonStack).toHaveAttribute("data-horizontal", "true");
+  it("shows UserAccessManagement component when User & Access Management button is clicked", () => {
+    render(<Admin />);
+
+    const button = screen.getByTestId("button-user & access management");
+    fireEvent.click(button);
+
+    expect(screen.getByTestId("useraccessmanagement-component")).toBeInTheDocument();
+    expect(screen.getByText("User Access Management Component")).toBeInTheDocument();
+  });
+
+  it("returns to main view when UserAccessManagement is closed", () => {
+    render(<Admin />);
+
+    const button = screen.getByTestId("button-user & access management");
+    fireEvent.click(button);
+
+    expect(screen.getByTestId("useraccessmanagement-component")).toBeInTheDocument();
+
+    const closeButton = screen.getByText("Close User Access Management");
+    fireEvent.click(closeButton);
+
+    expect(screen.getByTestId("button-operations")).toBeInTheDocument();
+    expect(screen.getByTestId("button-user & access management")).toBeInTheDocument();
+    expect(screen.queryByTestId("useraccessmanagement-component")).not.toBeInTheDocument();
   });
 });

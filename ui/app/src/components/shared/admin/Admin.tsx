@@ -2,10 +2,12 @@ import React, { useState } from "react";
 import { Stack, DefaultButton, Icon } from "@fluentui/react";
 import Operations from "./Operations";
 import Templates from "./Templates";
+import UserAccessManagement from "./UserAccessManagement";
 
 const Admin: React.FC = () => {
   const [showOperations, setShowOperations] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
+  const [showUserManagement, setShowUserManagement] = useState(false);
 
   return (
     <Stack className="tre-panel tre-admin-hub" tokens={{ childrenGap: 16 }}>
@@ -25,7 +27,7 @@ const Admin: React.FC = () => {
             <Icon iconName="Admin" style={{ fontSize: "26px" }} /> Admin
           </h1>
           <div style={{ color: "#605e5c", fontSize: "14px", marginTop: "4px" }}>
-            Manage resource templates, monitor operation logs, and inspect system deployment state.
+            Manage resource templates, monitor operation logs, inspect deployment state, and audit user access matrix.
           </div>
         </div>
       </Stack>
@@ -34,11 +36,12 @@ const Admin: React.FC = () => {
         Warning: These admin functions are advanced and experimental, proceed with caution.
       </p>
 
-      {!showOperations && !showTemplates && (
+      {!showOperations && !showTemplates && !showUserManagement && (
         <Stack tokens={{ childrenGap: 20 }}>
           <Stack horizontal tokens={{ childrenGap: 12 }} styles={{ root: { marginTop: 10 } }}>
-            <DefaultButton text="Operations" onClick={() => setShowOperations(true)} />
             <DefaultButton text="Templates" onClick={() => setShowTemplates(true)} />
+            <DefaultButton text="Operations" onClick={() => setShowOperations(true)} />
+            <DefaultButton text="User & Access Management" onClick={() => setShowUserManagement(true)} />
           </Stack>
 
           <div
@@ -148,12 +151,63 @@ const Admin: React.FC = () => {
                 operations.
               </p>
             </div>
+
+            <div
+              onClick={() => setShowUserManagement(true)}
+              style={{
+                background: "linear-gradient(135deg, #ffffff 0%, #fdf6ff 100%)",
+                border: "1px solid #e3c2f0",
+                borderRadius: "8px",
+                padding: "20px",
+                boxShadow: "0 2px 8px rgba(136, 23, 152, 0.08)",
+                cursor: "pointer",
+                transition: "all 0.2s ease-in-out",
+              }}
+              className="tre-admin-card"
+            >
+              <div
+                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}
+              >
+                <div
+                  style={{
+                    background: "#88179815",
+                    color: "#881798",
+                    borderRadius: "50%",
+                    width: "42px",
+                    height: "42px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Icon iconName="People" style={{ fontSize: "20px" }} />
+                </div>
+                <span
+                  style={{
+                    background: "#f3e5f5",
+                    color: "#881798",
+                    borderRadius: "12px",
+                    padding: "2px 10px",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                  }}
+                >
+                  RBAC Audit
+                </span>
+              </div>
+              <h3 style={{ margin: "0 0 6px 0", fontSize: "18px", color: "#881798" }}>User & Access Management</h3>
+              <p style={{ margin: 0, color: "#605e5c", fontSize: "13px", lineHeight: "1.5" }}>
+                Cross-workspace user & role matrix, bulk role reassignment or revocation, and assignable Azure AD users
+                explorer.
+              </p>
+            </div>
           </div>
         </Stack>
       )}
 
       {showOperations && <Operations onClose={() => setShowOperations(false)} />}
       {showTemplates && <Templates onClose={() => setShowTemplates(false)} />}
+      {showUserManagement && <UserAccessManagement onClose={() => setShowUserManagement(false)} />}
     </Stack>
   );
 };

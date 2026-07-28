@@ -132,6 +132,36 @@ const Templates: React.FC<TemplatesProps> = ({ onClose }) => {
     }
   };
 
+  const handleDeleteUnusedVersionsForTemplate = async (
+    templateName: string,
+    resourceType: string,
+    unusedVersions: Template[],
+  ) => {
+    if (unusedVersions.length === 0) return;
+
+    if (
+      !window.confirm(`Are you sure you want to delete ${unusedVersions.length} unused version(s) of ${templateName}?`)
+    ) {
+      return;
+    }
+
+    setLoading(true);
+    const deletedIds = new Set<string>();
+    try {
+      for (const t of unusedVersions) {
+        await api(`/templates/${t.id}`, HttpMethod.Delete, undefined, undefined, ResultType.None);
+        deletedIds.add(t.id);
+      }
+      setTemplates(templates.filter((t) => !deletedIds.has(t.id)));
+    } catch (error) {
+      console.error("Failed to delete unused template versions", error);
+      setTemplates(templates.filter((t) => !deletedIds.has(t.id)));
+      alert("Failed to delete some unused template versions. See console for details.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Filter templates based on search & resource type
   const filteredTemplates = templates.filter((template) => {
     const matchesSearch =
@@ -140,8 +170,12 @@ const Templates: React.FC<TemplatesProps> = ({ onClose }) => {
       (template.title && template.title.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (template.description && template.description.toLowerCase().includes(searchQuery.toLowerCase()));
 
+    const isVersionInUse = inUseTemplates.has(getTemplateVersionKey(template.name, template.version));
+
     const matchesType =
-      selectedResourceType === "all" || template.resourceType.toLowerCase() === selectedResourceType.toLowerCase();
+      selectedResourceType === "all" ||
+      (selectedResourceType === "unused" && !isVersionInUse) ||
+      template.resourceType.toLowerCase() === selectedResourceType.toLowerCase();
 
     return matchesSearch && matchesType;
   });
@@ -161,6 +195,7 @@ const Templates: React.FC<TemplatesProps> = ({ onClose }) => {
 
   const totalFamiliesCount = Object.keys(groupedTemplates).length;
   const inUseCount = templates.filter((t) => inUseTemplates.has(getTemplateVersionKey(t.name, t.version))).length;
+  const unusedTemplatesCount = templates.length - inUseCount;
 
   return (
     <Stack className="tre-panel tre-resource-panel" tokens={{ childrenGap: 16 }}>
@@ -219,6 +254,18 @@ const Templates: React.FC<TemplatesProps> = ({ onClose }) => {
             <div style={{ fontSize: "12px", color: "#605e5c" }}>Versions In Use</div>
             <div style={{ fontSize: "20px", fontWeight: 600, color: "#323130" }}>{inUseCount}</div>
           </div>
+          <div
+            style={{
+              background: "#f3f2f1",
+              padding: "10px 16px",
+              borderRadius: "6px",
+              flex: "1 1 180px",
+              borderLeft: "4px solid #a4262c",
+            }}
+          >
+            <div style={{ fontSize: "12px", color: "#605e5c" }}>Unused Versions</div>
+            <div style={{ fontSize: "20px", fontWeight: 600, color: "#323130" }}>{unusedTemplatesCount}</div>
+          </div>
         </div>
       )}
 
@@ -242,6 +289,7 @@ const Templates: React.FC<TemplatesProps> = ({ onClose }) => {
           <Stack horizontal tokens={{ childrenGap: 6 }}>
             {[
               "all",
+              "unused",
               ResourceType.Workspace,
               ResourceType.WorkspaceService,
               ResourceType.UserResource,
@@ -262,7 +310,7 @@ const Templates: React.FC<TemplatesProps> = ({ onClose }) => {
                   transition: "all 0.15s ease-in-out",
                 }}
               >
-                {type === "all" ? "All Types" : type}
+                {type === "all" ? "All Types" : type === "unused" ? "Unused Only" : type}
               </button>
             ))}
           </Stack>
@@ -285,6 +333,9 @@ const Templates: React.FC<TemplatesProps> = ({ onClose }) => {
             const firstTemplate = templateVersions[0];
             const isAnyVersionInUse = templateVersions.some((v) =>
               inUseTemplates.has(getTemplateVersionKey(v.name, v.version)),
+            );
+            const unusedVersionsInThisTemplate = templateVersions.filter(
+              (v) => !inUseTemplates.has(getTemplateVersionKey(v.name, v.version)),
             );
             const typeStyle = getResourceTypeColor(firstTemplate.resourceType);
 
@@ -343,15 +394,31 @@ const Templates: React.FC<TemplatesProps> = ({ onClose }) => {
                       </div>
                     )}
                   </div>
-                  <PrimaryButton
-                    text={`Delete All ${templateVersions.length} Version(s)`}
-                    onClick={() =>
-                      handleDeleteAllVersions(firstTemplate.name, firstTemplate.resourceType, templateVersions)
-                    }
-                    styles={{ root: { backgroundColor: isAnyVersionInUse ? "#b3b3b3" : "#a4262c" } }}
-                    disabled={isAnyVersionInUse}
-                    data-testid={`delete-all-${firstTemplate.name}`}
-                  />
+                  <Stack horizontal tokens={{ childrenGap: 8 }}>
+                    {unusedVersionsInThisTemplate.length > 0 && (
+                      <DefaultButton
+                        text={`Delete Unused Versions (${unusedVersionsInThisTemplate.length})`}
+                        onClick={() =>
+                          handleDeleteUnusedVersionsForTemplate(
+                            firstTemplate.name,
+                            firstTemplate.resourceType,
+                            unusedVersionsInThisTemplate,
+                          )
+                        }
+                        disabled={loading}
+                        data-testid={`delete-unused-${firstTemplate.name}`}
+                      />
+                    )}
+                    <PrimaryButton
+                      text={`Delete All ${templateVersions.length} Version(s)`}
+                      onClick={() =>
+                        handleDeleteAllVersions(firstTemplate.name, firstTemplate.resourceType, templateVersions)
+                      }
+                      styles={{ root: { backgroundColor: isAnyVersionInUse ? "#b3b3b3" : "#a4262c" } }}
+                      disabled={isAnyVersionInUse || loading}
+                      data-testid={`delete-all-${firstTemplate.name}`}
+                    />
+                  </Stack>
                 </Stack>
 
                 <table className="tre-table" style={{ width: "100%", borderCollapse: "collapse" }}>
