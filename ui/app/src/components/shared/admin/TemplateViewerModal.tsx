@@ -12,12 +12,15 @@ import {
   Icon,
 } from "@fluentui/react";
 import { useAuthApiCall, HttpMethod } from "../../../hooks/useAuthApiCall";
+import { ApiEndpoint } from "../../../models/apiEndpoints";
+import { ResourceType } from "../../../models/resourceType";
 
 export interface TemplateViewerModalProps {
   templateName: string;
   initialVersion: string;
   compareVersion?: string;
   resourceType?: string;
+  parentServiceTemplateName?: string;
   onClose: () => void;
 }
 
@@ -37,6 +40,62 @@ export interface DiffLine {
   leftLineNum?: number;
   rightLineNum?: number;
   content: string;
+}
+
+export interface SideBySideRow {
+  left?: {
+    lineNum: number;
+    content: string;
+    type: "removed" | "unchanged";
+  };
+  right?: {
+    lineNum: number;
+    content: string;
+    type: "added" | "unchanged";
+  };
+}
+
+/**
+ * Extracts template object from API response wrappers (workspaceTemplate, sharedServiceTemplate, etc.)
+ */
+export function extractTemplateObject(res: any): TemplateRecord | null {
+  if (!res) return null;
+  if (res.workspaceTemplate) return res.workspaceTemplate;
+  if (res.workspaceServiceTemplate) return res.workspaceServiceTemplate;
+  if (res.sharedServiceTemplate) return res.sharedServiceTemplate;
+  if (res.userResourceTemplate) return res.userResourceTemplate;
+  if (res.template) return res.template;
+  if (res.name || res.version || res.id) return res;
+  return null;
+}
+
+/**
+ * Constructs version-specific API endpoint URL (e.g. /api/workspace-templates/tre-workspace-axym?version=0.2.37)
+ */
+export function getTemplateEndpoint(
+  templateName: string,
+  version: string,
+  resourceType?: string,
+  parentServiceTemplateName?: string,
+): string {
+  const versionQuery = version ? `?version=${encodeURIComponent(version)}` : "";
+  const typeStr = (resourceType || "").toLowerCase();
+
+  if (typeStr === ResourceType.Workspace.toLowerCase()) {
+    return `${ApiEndpoint.WorkspaceTemplates}/${templateName}${versionQuery}`;
+  }
+  if (typeStr === ResourceType.WorkspaceService.toLowerCase()) {
+    return `${ApiEndpoint.WorkspaceServiceTemplates}/${templateName}${versionQuery}`;
+  }
+  if (typeStr === ResourceType.SharedService.toLowerCase()) {
+    return `${ApiEndpoint.SharedServiceTemplates}/${templateName}${versionQuery}`;
+  }
+  if (typeStr === ResourceType.UserResource.toLowerCase()) {
+    const parent = parentServiceTemplateName || "base-service";
+    return `${ApiEndpoint.WorkspaceServiceTemplates}/${parent}/${ApiEndpoint.UserResourceTemplates}/${templateName}${versionQuery}`;
+  }
+
+  return `${ApiEndpoint.WorkspaceTemplates}/${templateName}${versionQuery}`;
 }
 
 /**
@@ -95,6 +154,115 @@ export function computeLineDiff(leftText: string, rightText: string): DiffLine[]
 }
 
 /**
+ * Converts diff lines into aligned side-by-side rows.
+ */
+export function computeSideBySideRows(diffLines: DiffLine[]): SideBySideRow[] {
+  const rows: SideBySideRow[] = [];
+  let i = 0;
+
+  while (i < diffLines.length) {
+    const line = diffLines[i];
+
+    if (line.type === "unchanged") {
+      rows.push({
+        left: { lineNum: line.leftLineNum!, content: line.content, type: "unchanged" },
+        right: { lineNum: line.rightLineNum!, content: line.content, type: "unchanged" },
+      });
+      i++;
+    } else if (line.type === "removed") {
+      if (i + 1 < diffLines.length && diffLines[i + 1].type === "added") {
+        const nextLine = diffLines[i + 1];
+        rows.push({
+          left: { lineNum: line.leftLineNum!, content: line.content, type: "removed" },
+          right: { lineNum: nextLine.rightLineNum!, content: nextLine.content, type: "added" },
+        });
+        i += 2;
+      } else {
+        rows.push({
+          left: { lineNum: line.leftLineNum!, content: line.content, type: "removed" },
+        });
+        i++;
+      }
+    } else if (line.type === "added") {
+      rows.push({
+        right: { lineNum: line.rightLineNum!, content: line.content, type: "added" },
+      });
+      i++;
+    }
+  }
+
+  return rows;
+}
+
+/**
+ * Syntax highlights JSON keys, strings, numbers, booleans, and structural tokens.
+ */
+export function highlightJsonTokens(line: string): React.ReactNode {
+  const tokenRegex =
+    /("(\\u[a-fA-F0-9]{4}|\\[^u]|[^\\"])*")\s*(:)|("(\\u[a-fA-F0-9]{4}|\\[^u]|[^\\"])*")|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)|(true|false|null)|([{}[\]:,])/g;
+
+  const elements: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = tokenRegex.exec(line)) !== null) {
+    const matchIndex = match.index;
+    if (matchIndex > lastIndex) {
+      elements.push(line.slice(lastIndex, matchIndex));
+    }
+
+    const [fullMatch, keyStr, keyColon, valStr, numStr, boolStr, bracketStr] = match;
+
+    if (keyStr) {
+      elements.push(
+        <span key={`${matchIndex}-key`} style={{ color: "#9cdcfe", fontWeight: 500 }}>
+          {keyStr}
+        </span>,
+        keyColon ? (
+          <span key={`${matchIndex}-colon`} style={{ color: "#d4d4d4" }}>
+            :
+          </span>
+        ) : null,
+      );
+    } else if (valStr) {
+      elements.push(
+        <span key={`${matchIndex}-val`} style={{ color: "#ce9178" }}>
+          {valStr}
+        </span>,
+      );
+    } else if (numStr) {
+      elements.push(
+        <span key={`${matchIndex}-num`} style={{ color: "#b5cea8" }}>
+          {numStr}
+        </span>,
+      );
+    } else if (boolStr) {
+      elements.push(
+        <span key={`${matchIndex}-bool`} style={{ color: "#569cd6", fontWeight: 600 }}>
+          {boolStr}
+        </span>,
+      );
+    } else if (bracketStr) {
+      elements.push(
+        <span key={`${matchIndex}-bracket`} style={{ color: "#ffd700" }}>
+          {bracketStr}
+        </span>,
+      );
+    } else {
+      elements.push(fullMatch);
+    }
+
+    lastIndex = tokenRegex.lastIndex;
+  }
+
+  if (lastIndex < line.length) {
+    elements.push(line.slice(lastIndex));
+  }
+
+  return <>{elements}</>;
+}
+
+/**
  * Formats full template JSON omitting Cosmos DB system fields (_etag, _rid, etc.)
  * and ensuring full template schema fields are present.
  */
@@ -146,36 +314,73 @@ export const TemplateViewerModal: React.FC<TemplateViewerModalProps> = ({
   initialVersion,
   compareVersion: propCompareVersion,
   resourceType,
+  parentServiceTemplateName,
   onClose,
 }) => {
   const api = useAuthApiCall();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [allTemplates, setAllTemplates] = useState<TemplateRecord[]>([]);
+  const [fetchedVersionMap, setFetchedVersionMap] = useState<Map<string, TemplateRecord>>(new Map());
   const [selectedVersion, setSelectedVersion] = useState<string>(initialVersion);
   const [compareVersion, setCompareVersion] = useState<string>(propCompareVersion || "none");
-  const [diffMode, setDiffMode] = useState<"sideBySide" | "unified" | "json">("unified");
+  const [diffMode, setDiffMode] = useState<"sideBySide" | "unified" | "json">("sideBySide");
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    const fetchTemplates = async () => {
+    let isMounted = true;
+    const fetchTemplatesAndSelectedVersions = async () => {
       setLoading(true);
       setError(null);
       try {
-        const templates = await api("templates", HttpMethod.Get);
-        if (Array.isArray(templates)) {
-          setAllTemplates(templates);
-        } else {
-          setAllTemplates([]);
+        // 1. Fetch all templates list for version dropdown choices
+        const all = await api("templates", HttpMethod.Get).catch(() => []);
+        if (isMounted && Array.isArray(all)) {
+          setAllTemplates(all);
+        }
+
+        // 2. Fetch version-specific template definition endpoint (e.g. /api/workspace-templates/tre-workspace-axym?version=0.2.37)
+        const endpoint = getTemplateEndpoint(templateName, selectedVersion, resourceType, parentServiceTemplateName);
+        try {
+          const res = await api(endpoint, HttpMethod.Get);
+          const obj = extractTemplateObject(res);
+          if (isMounted && obj) {
+            setFetchedVersionMap((prev) => new Map(prev).set(selectedVersion, obj));
+          }
+        } catch {
+          // fallback
+        }
+
+        // 3. Fetch compare version definition if specified
+        if (compareVersion && compareVersion !== "none") {
+          const compareEndpoint = getTemplateEndpoint(
+            templateName,
+            compareVersion,
+            resourceType,
+            parentServiceTemplateName,
+          );
+          try {
+            const compRes = await api(compareEndpoint, HttpMethod.Get);
+            const compObj = extractTemplateObject(compRes);
+            if (isMounted && compObj) {
+              setFetchedVersionMap((prev) => new Map(prev).set(compareVersion, compObj));
+            }
+          } catch {
+            // fallback
+          }
         }
       } catch (err: any) {
-        setError(err.message || "Failed to fetch template definitions.");
+        if (isMounted) setError(err.message || "Failed to load template definition.");
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
-    fetchTemplates();
-  }, [api]);
+
+    fetchTemplatesAndSelectedVersions();
+    return () => {
+      isMounted = false;
+    };
+  }, [api, templateName, selectedVersion, compareVersion, resourceType, parentServiceTemplateName]);
 
   // Filter templates matching templateName
   const matchingTemplates = useMemo(() => {
@@ -206,6 +411,9 @@ export const TemplateViewerModal: React.FC<TemplateViewerModalProps> = ({
 
   // Get selected template JSON object
   const selectedTemplate = useMemo(() => {
+    if (fetchedVersionMap.has(selectedVersion)) {
+      return fetchedVersionMap.get(selectedVersion)!;
+    }
     return (
       matchingTemplates.find((t) => t.version === selectedVersion) || {
         id: `${templateName}-${selectedVersion}`,
@@ -214,11 +422,14 @@ export const TemplateViewerModal: React.FC<TemplateViewerModalProps> = ({
         resourceType: resourceType || "unknown",
       }
     );
-  }, [matchingTemplates, selectedVersion, templateName, resourceType]);
+  }, [fetchedVersionMap, selectedVersion, matchingTemplates, templateName, resourceType]);
 
   // Get compare template JSON object
   const targetCompareTemplate = useMemo(() => {
     if (compareVersion === "none") return null;
+    if (fetchedVersionMap.has(compareVersion)) {
+      return fetchedVersionMap.get(compareVersion)!;
+    }
     return (
       matchingTemplates.find((t) => t.version === compareVersion) || {
         id: `${templateName}-${compareVersion}`,
@@ -227,7 +438,7 @@ export const TemplateViewerModal: React.FC<TemplateViewerModalProps> = ({
         resourceType: resourceType || "unknown",
       }
     );
-  }, [matchingTemplates, compareVersion, templateName, resourceType]);
+  }, [compareVersion, fetchedVersionMap, matchingTemplates, templateName, resourceType]);
 
   const baseJsonStr = useMemo(
     () => formatFullTemplateJson(selectedTemplate, templateName, selectedVersion, resourceType),
@@ -247,6 +458,11 @@ export const TemplateViewerModal: React.FC<TemplateViewerModalProps> = ({
     return computeLineDiff(baseJsonStr, compareJsonStr);
   }, [baseJsonStr, compareJsonStr, targetCompareTemplate]);
 
+  const sideBySideRows = useMemo(() => {
+    if (!targetCompareTemplate) return [];
+    return computeSideBySideRows(diffLines);
+  }, [diffLines, targetCompareTemplate]);
+
   const diffStats = useMemo(() => {
     let added = 0;
     let removed = 0;
@@ -263,6 +479,11 @@ export const TemplateViewerModal: React.FC<TemplateViewerModalProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const currentEndpointUrl = useMemo(
+    () => getTemplateEndpoint(templateName, selectedVersion, resourceType, parentServiceTemplateName),
+    [templateName, selectedVersion, resourceType, parentServiceTemplateName],
+  );
+
   return (
     <Modal
       isOpen={true}
@@ -271,11 +492,11 @@ export const TemplateViewerModal: React.FC<TemplateViewerModalProps> = ({
       containerClassName="tre-template-viewer-modal"
       styles={{
         main: {
-          minWidth: "850px",
-          maxWidth: "1100px",
-          width: "90vw",
-          maxHeight: "90vh",
-          height: "85vh",
+          minWidth: "900px",
+          maxWidth: "1200px",
+          width: "92vw",
+          maxHeight: "92vh",
+          height: "88vh",
           borderRadius: "8px",
           padding: "24px",
           display: "flex",
@@ -288,9 +509,14 @@ export const TemplateViewerModal: React.FC<TemplateViewerModalProps> = ({
         <Stack horizontal verticalAlign="center" tokens={{ childrenGap: 10 }}>
           <Icon iconName="Code" style={{ fontSize: "22px", color: "#0078d4" }} />
           <div>
-            <h2 style={{ margin: 0, fontSize: "20px", fontWeight: 600, color: "#0078d4" }}>Template Viewer & Diff</h2>
+            <h2 style={{ margin: 0, fontSize: "20px", fontWeight: 600, color: "#0078d4" }}>
+              Template Viewer & Side-by-Side Diff
+            </h2>
             <div style={{ fontSize: "12px", color: "#605e5c", marginTop: "2px" }}>
-              Template: <strong>{templateName}</strong> | Base Version: <strong>v{selectedVersion}</strong>
+              Template: <strong>{templateName}</strong> | API Endpoint:{" "}
+              <code style={{ background: "#f3f2f1", padding: "2px 6px", borderRadius: "4px", fontSize: "11px" }}>
+                /api/{currentEndpointUrl}
+              </code>
             </div>
           </div>
         </Stack>
@@ -307,7 +533,7 @@ export const TemplateViewerModal: React.FC<TemplateViewerModalProps> = ({
 
       {loading ? (
         <Stack horizontalAlign="center" verticalAlign="center" style={{ flex: 1 }}>
-          <Spinner label="Loading template definitions..." />
+          <Spinner label="Loading template definitions from API..." />
         </Stack>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}>
@@ -362,13 +588,29 @@ export const TemplateViewerModal: React.FC<TemplateViewerModalProps> = ({
                   }}
                 >
                   <button
+                    onClick={() => setDiffMode("sideBySide")}
+                    style={{
+                      border: "none",
+                      background: diffMode === "sideBySide" ? "#ffffff" : "transparent",
+                      color: diffMode === "sideBySide" ? "#0078d4" : "#605e5c",
+                      fontWeight: diffMode === "sideBySide" ? 600 : 400,
+                      padding: "4px 12px",
+                      borderRadius: "4px",
+                      cursor: "pointer",
+                      fontSize: "12px",
+                      boxShadow: diffMode === "sideBySide" ? "0 1px 2px rgba(0,0,0,0.1)" : "none",
+                    }}
+                  >
+                    Side-by-Side Diff
+                  </button>
+                  <button
                     onClick={() => setDiffMode("unified")}
                     style={{
                       border: "none",
                       background: diffMode === "unified" ? "#ffffff" : "transparent",
                       color: diffMode === "unified" ? "#0078d4" : "#605e5c",
                       fontWeight: diffMode === "unified" ? 600 : 400,
-                      padding: "4px 10px",
+                      padding: "4px 12px",
                       borderRadius: "4px",
                       cursor: "pointer",
                       fontSize: "12px",
@@ -376,22 +618,6 @@ export const TemplateViewerModal: React.FC<TemplateViewerModalProps> = ({
                     }}
                   >
                     Unified Diff
-                  </button>
-                  <button
-                    onClick={() => setDiffMode("sideBySide")}
-                    style={{
-                      border: "none",
-                      background: diffMode === "sideBySide" ? "#ffffff" : "transparent",
-                      color: diffMode === "sideBySide" ? "#0078d4" : "#605e5c",
-                      fontWeight: diffMode === "sideBySide" ? 600 : 400,
-                      padding: "4px 10px",
-                      borderRadius: "4px",
-                      cursor: "pointer",
-                      fontSize: "12px",
-                      boxShadow: diffMode === "sideBySide" ? "0 1px 2px rgba(0,0,0,0.1)" : "none",
-                    }}
-                  >
-                    Side-by-Side
                   </button>
                 </div>
               )}
@@ -442,9 +668,185 @@ export const TemplateViewerModal: React.FC<TemplateViewerModalProps> = ({
             }}
           >
             {compareVersion === "none" ? (
-              /* Single Version JSON View */
-              <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{baseJsonStr}</pre>
-            ) : diffMode === "unified" ? (
+              /* Single Version JSON View with Syntax Highlighting */
+              <div style={{ display: "flex", flexDirection: "column" }}>
+                {baseJsonStr.split("\n").map((line, idx) => (
+                  <div key={idx} style={{ display: "flex", padding: "1px 4px" }}>
+                    <span
+                      style={{
+                        width: "35px",
+                        userSelect: "none",
+                        opacity: 0.4,
+                        textAlign: "right",
+                        marginRight: "12px",
+                        color: "#858585",
+                      }}
+                    >
+                      {idx + 1}
+                    </span>
+                    <span style={{ whiteSpace: "pre-wrap", wordBreak: "break-all" }}>{highlightJsonTokens(line)}</span>
+                  </div>
+                ))}
+              </div>
+            ) : diffMode === "sideBySide" ? (
+              /* Side-by-Side Diff View with Syntax & Code Highlights */
+              <div style={{ display: "flex", flexDirection: "column", width: "100%" }}>
+                {/* Headers */}
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "12px",
+                    marginBottom: "8px",
+                    position: "sticky",
+                    top: 0,
+                    zIndex: 2,
+                    background: "#1e1e1e",
+                    paddingBottom: "4px",
+                  }}
+                >
+                  <div
+                    style={{
+                      flex: 1,
+                      background: "#252526",
+                      padding: "6px 12px",
+                      fontWeight: 600,
+                      color: "#9cdcfe",
+                      borderRadius: "4px",
+                      borderLeft: "3px solid #0078d4",
+                    }}
+                  >
+                    Base Version: v{selectedVersion}
+                  </div>
+                  <div
+                    style={{
+                      flex: 1,
+                      background: "#252526",
+                      padding: "6px 12px",
+                      fontWeight: 600,
+                      color: "#7ee787",
+                      borderRadius: "4px",
+                      borderLeft: "3px solid #2ea043",
+                    }}
+                  >
+                    Target Version: v{compareVersion}
+                  </div>
+                </div>
+
+                {/* Side-by-Side Rows */}
+                {sideBySideRows.map((row, idx) => {
+                  const leftBg = row.left?.type === "removed" ? "rgba(248, 81, 73, 0.20)" : "transparent";
+                  const rightBg = row.right?.type === "added" ? "rgba(46, 160, 67, 0.20)" : "transparent";
+
+                  return (
+                    <div
+                      key={idx}
+                      style={{
+                        display: "flex",
+                        gap: "12px",
+                        borderBottom: "1px solid rgba(255,255,255,0.03)",
+                      }}
+                    >
+                      {/* Left Pane */}
+                      <div
+                        style={{
+                          flex: 1,
+                          display: "flex",
+                          backgroundColor: leftBg,
+                          borderLeft: row.left?.type === "removed" ? "3px solid #f85149" : "3px solid transparent",
+                          padding: "1px 4px",
+                        }}
+                      >
+                        <span
+                          style={{
+                            width: "35px",
+                            userSelect: "none",
+                            opacity: 0.4,
+                            textAlign: "right",
+                            marginRight: "8px",
+                            color: "#858585",
+                          }}
+                        >
+                          {row.left?.lineNum || ""}
+                        </span>
+                        <span
+                          style={{
+                            width: "16px",
+                            fontWeight: "bold",
+                            userSelect: "none",
+                            color: "#ff7b72",
+                          }}
+                        >
+                          {row.left?.type === "removed" ? "-" : " "}
+                        </span>
+                        <span
+                          style={{
+                            whiteSpace: "pre-wrap",
+                            wordBreak: "break-all",
+                            color: row.left?.type === "removed" ? "#ff7b72" : undefined,
+                          }}
+                        >
+                          {row.left
+                            ? row.left.type === "removed"
+                              ? row.left.content
+                              : highlightJsonTokens(row.left.content)
+                            : ""}
+                        </span>
+                      </div>
+
+                      {/* Divider */}
+                      <div style={{ width: "1px", background: "rgba(255,255,255,0.1)" }} />
+
+                      {/* Right Pane */}
+                      <div
+                        style={{
+                          flex: 1,
+                          display: "flex",
+                          backgroundColor: rightBg,
+                          borderLeft: row.right?.type === "added" ? "3px solid #2ea043" : "3px solid transparent",
+                          padding: "1px 4px",
+                        }}
+                      >
+                        <span
+                          style={{
+                            width: "35px",
+                            userSelect: "none",
+                            opacity: 0.4,
+                            textAlign: "right",
+                            marginRight: "8px",
+                            color: "#858585",
+                          }}
+                        >
+                          {row.right?.lineNum || ""}
+                        </span>
+                        <span
+                          style={{
+                            width: "16px",
+                            fontWeight: "bold",
+                            userSelect: "none",
+                            color: "#7ee787",
+                          }}
+                        >
+                          {row.right?.type === "added" ? "+" : " "}
+                        </span>
+                        <span
+                          style={{
+                            whiteSpace: "pre-wrap",
+                            wordBreak: "break-all",
+                            color: row.right?.type === "added" ? "#7ee787" : undefined,
+                          }}
+                        >
+                          {row.right
+                            ? row.right.type === "added"
+                              ? row.right.content
+                              : highlightJsonTokens(row.right.content)
+                            : ""}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
               /* Unified Diff View */
               <div style={{ display: "flex", flexDirection: "column" }}>
                 {diffLines.map((line, idx) => {
@@ -493,45 +895,12 @@ export const TemplateViewerModal: React.FC<TemplateViewerModalProps> = ({
                         {line.rightLineNum || ""}
                       </span>
                       <span style={{ width: "20px", fontWeight: "bold", userSelect: "none" }}>{prefix}</span>
-                      <span style={{ whiteSpace: "pre-wrap", wordBreak: "break-all" }}>{line.content}</span>
+                      <span style={{ whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
+                        {line.type === "unchanged" ? highlightJsonTokens(line.content) : line.content}
+                      </span>
                     </div>
                   );
                 })}
-              </div>
-            ) : (
-              /* Side-by-Side Diff View */
-              <div style={{ display: "flex", width: "100%", gap: "12px" }}>
-                <div style={{ flex: 1, overflowX: "auto" }}>
-                  <div
-                    style={{
-                      background: "#252526",
-                      padding: "4px 8px",
-                      fontWeight: 600,
-                      color: "#9cdcfe",
-                      marginBottom: "6px",
-                      borderRadius: "3px",
-                    }}
-                  >
-                    v{selectedVersion} (Base)
-                  </div>
-                  <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{baseJsonStr}</pre>
-                </div>
-                <div style={{ width: "1px", background: "#3c3c3c" }} />
-                <div style={{ flex: 1, overflowX: "auto" }}>
-                  <div
-                    style={{
-                      background: "#252526",
-                      padding: "4px 8px",
-                      fontWeight: 600,
-                      color: "#ce9178",
-                      marginBottom: "6px",
-                      borderRadius: "3px",
-                    }}
-                  >
-                    v{compareVersion} (Target)
-                  </div>
-                  <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{compareJsonStr}</pre>
-                </div>
               </div>
             )}
           </div>
@@ -540,4 +909,5 @@ export const TemplateViewerModal: React.FC<TemplateViewerModalProps> = ({
     </Modal>
   );
 };
+
 export default TemplateViewerModal;

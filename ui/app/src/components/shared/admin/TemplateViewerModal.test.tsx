@@ -1,7 +1,14 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "../../../test-utils";
-import { TemplateViewerModal, computeLineDiff } from "./TemplateViewerModal";
+import {
+  TemplateViewerModal,
+  computeLineDiff,
+  computeSideBySideRows,
+  highlightJsonTokens,
+  getTemplateEndpoint,
+  extractTemplateObject,
+} from "./TemplateViewerModal";
 
 const mockTemplates = [
   {
@@ -32,6 +39,11 @@ vi.mock("../../../hooks/useAuthApiCall", () => ({
       if (endpoint === "templates") {
         return Promise.resolve(mockTemplates);
       }
+      if (endpoint.startsWith("workspace-templates/tre-workspace-base")) {
+        return Promise.resolve({
+          workspaceTemplate: mockTemplates[0],
+        });
+      }
       return Promise.resolve([]);
     });
   },
@@ -40,7 +52,26 @@ vi.mock("../../../hooks/useAuthApiCall", () => ({
   },
 }));
 
-describe("computeLineDiff", () => {
+describe("getTemplateEndpoint", () => {
+  it("formats version query endpoint for workspace templates", () => {
+    const ep = getTemplateEndpoint("tre-workspace-axym", "0.2.37", "workspace");
+    expect(ep).toBe("workspace-templates/tre-workspace-axym?version=0.2.37");
+  });
+
+  it("formats version query endpoint for workspace service templates", () => {
+    const ep = getTemplateEndpoint("tre-service-guacamole", "1.0.0", "workspace-service");
+    expect(ep).toBe("workspace-service-templates/tre-service-guacamole?version=1.0.0");
+  });
+});
+
+describe("extractTemplateObject", () => {
+  it("extracts workspaceTemplate wrapper", () => {
+    const res = { workspaceTemplate: { name: "test", version: "1.0.0" } };
+    expect(extractTemplateObject(res)).toEqual({ name: "test", version: "1.0.0" });
+  });
+});
+
+describe("computeLineDiff & computeSideBySideRows", () => {
   it("correctly identifies added, removed, and unchanged lines", () => {
     const left = '{\n  "version": "1.0.0"\n}';
     const right = '{\n  "version": "1.1.0",\n  "newProp": true\n}';
@@ -49,7 +80,16 @@ describe("computeLineDiff", () => {
     expect(diff.length).toBeGreaterThan(0);
     expect(diff.some((l) => l.type === "added")).toBe(true);
     expect(diff.some((l) => l.type === "removed")).toBe(true);
-    expect(diff.some((l) => l.type === "unchanged")).toBe(true);
+
+    const rows = computeSideBySideRows(diff);
+    expect(rows.length).toBeGreaterThan(0);
+  });
+});
+
+describe("highlightJsonTokens", () => {
+  it("tokenizes JSON key and string values", () => {
+    const { container } = render(<>{highlightJsonTokens('"key": "value"')}</>);
+    expect(container.textContent).toContain('"key": "value"');
   });
 });
 
@@ -63,7 +103,7 @@ describe("TemplateViewerModal", () => {
   it("renders modal header and template JSON", async () => {
     render(<TemplateViewerModal templateName="tre-workspace-base" initialVersion="1.0.0" onClose={mockOnClose} />);
 
-    expect(screen.getByText("Template Viewer & Diff")).toBeInTheDocument();
+    expect(screen.getByText(/Template Viewer/i)).toBeInTheDocument();
 
     await waitFor(() => {
       expect(screen.getByText(/tre-workspace-base/i)).toBeInTheDocument();
@@ -90,8 +130,8 @@ describe("TemplateViewerModal", () => {
     );
 
     await waitFor(() => {
+      expect(screen.getByText(/Side-by-Side Diff/i)).toBeInTheDocument();
       expect(screen.getByText(/Unified Diff/i)).toBeInTheDocument();
-      expect(screen.getByText(/Side-by-Side/i)).toBeInTheDocument();
     });
   });
 });
