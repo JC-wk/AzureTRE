@@ -30,6 +30,21 @@ vi.mock("./UserAccessManagement", () => ({
   ),
 }));
 
+vi.mock("./UpgradableResources", () => ({
+  default: ({ onClose }: any) => (
+    <div data-testid="upgradableresources-component">
+      <span>Upgradable Resources Component</span>
+      <button onClick={onClose}>Close Upgradable Resources</button>
+    </div>
+  ),
+  UpgradableResources: ({ onClose }: any) => (
+    <div data-testid="upgradableresources-component">
+      <span>Upgradable Resources Component</span>
+      <button onClick={onClose}>Close Upgradable Resources</button>
+    </div>
+  ),
+}));
+
 // Mock FluentUI components
 vi.mock("@fluentui/react", async () => {
   const actual = await vi.importActual("@fluentui/react");
@@ -235,5 +250,37 @@ describe("Admin Component", () => {
     expect(screen.getByTestId("button-operations")).toBeInTheDocument();
     expect(screen.getByTestId("button-user & access management")).toBeInTheDocument();
     expect(screen.queryByTestId("useraccessmanagement-component")).not.toBeInTheDocument();
+  });
+
+  it("displays Upgradable Components button initially", () => {
+    render(<Admin />);
+
+    expect(screen.getByTestId("button-upgradable components")).toBeInTheDocument();
+  });
+
+  it("shows UpgradableResources component when Upgradable Components button is clicked", () => {
+    render(<Admin />);
+
+    const button = screen.getByTestId("button-upgradable components");
+    fireEvent.click(button);
+
+    expect(screen.getByTestId("upgradableresources-component")).toBeInTheDocument();
+    expect(screen.getByText("Upgradable Resources Component")).toBeInTheDocument();
+  });
+
+  it("returns to main view when UpgradableResources is closed", () => {
+    render(<Admin />);
+
+    const button = screen.getByTestId("button-upgradable components");
+    fireEvent.click(button);
+
+    expect(screen.getByTestId("upgradableresources-component")).toBeInTheDocument();
+
+    const closeButton = screen.getByText("Close Upgradable Resources");
+    fireEvent.click(closeButton);
+
+    expect(screen.getByTestId("button-operations")).toBeInTheDocument();
+    expect(screen.getByTestId("button-upgradable components")).toBeInTheDocument();
+    expect(screen.queryByTestId("upgradableresources-component")).not.toBeInTheDocument();
   });
 });

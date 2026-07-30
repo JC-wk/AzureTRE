@@ -1,13 +1,25 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { Stack, DefaultButton, Icon } from "@fluentui/react";
 import Operations from "./Operations";
 import Templates from "./Templates";
 import UserAccessManagement from "./UserAccessManagement";
+import UpgradableResources from "./UpgradableResources";
 
 const Admin: React.FC = () => {
   const [showOperations, setShowOperations] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
   const [showUserManagement, setShowUserManagement] = useState(false);
+  const [showUpgrades, setShowUpgrades] = useState(false);
+
+  const location = useLocation();
+
+  useEffect(() => {
+    setShowOperations(false);
+    setShowTemplates(false);
+    setShowUserManagement(false);
+    setShowUpgrades(false);
+  }, [location.state, location.key]);
 
   return (
     <Stack className="tre-panel tre-admin-hub" tokens={{ childrenGap: 16 }}>
@@ -27,7 +39,8 @@ const Admin: React.FC = () => {
             <Icon iconName="Admin" style={{ fontSize: "26px" }} /> Admin
           </h1>
           <div style={{ color: "#605e5c", fontSize: "14px", marginTop: "4px" }}>
-            Manage resource templates, monitor operation logs, inspect deployment state, and audit user access matrix.
+            Manage resource templates, monitor operation logs, inspect deployment state, audit user access matrix, and
+            upgrade components.
           </div>
         </div>
       </Stack>
@@ -36,10 +49,11 @@ const Admin: React.FC = () => {
         Warning: These admin functions are advanced and experimental, proceed with caution.
       </p>
 
-      {!showOperations && !showTemplates && !showUserManagement && (
+      {!showOperations && !showTemplates && !showUserManagement && !showUpgrades && (
         <Stack tokens={{ childrenGap: 20 }}>
           <Stack horizontal tokens={{ childrenGap: 12 }} styles={{ root: { marginTop: 10 } }}>
             <DefaultButton text="Templates" onClick={() => setShowTemplates(true)} />
+            <DefaultButton text="Upgradable Components" onClick={() => setShowUpgrades(true)} />
             <DefaultButton text="Operations" onClick={() => setShowOperations(true)} />
             <DefaultButton text="User & Access Management" onClick={() => setShowUserManagement(true)} />
           </Stack>
@@ -99,6 +113,56 @@ const Admin: React.FC = () => {
               <p style={{ margin: 0, color: "#605e5c", fontSize: "13px", lineHeight: "1.5" }}>
                 Inspect registered resource templates across workspaces, services, and user resources. Delete unused
                 versions or entire template suites.
+              </p>
+            </div>
+
+            <div
+              onClick={() => setShowUpgrades(true)}
+              style={{
+                background: "linear-gradient(135deg, #ffffff 0%, #f0f7ff 100%)",
+                border: "1px solid #b3d6fc",
+                borderRadius: "8px",
+                padding: "20px",
+                boxShadow: "0 2px 8px rgba(0, 120, 212, 0.08)",
+                cursor: "pointer",
+                transition: "all 0.2s ease-in-out",
+              }}
+              className="tre-admin-card"
+            >
+              <div
+                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}
+              >
+                <div
+                  style={{
+                    background: "#0078d415",
+                    color: "#0078d4",
+                    borderRadius: "50%",
+                    width: "42px",
+                    height: "42px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Icon iconName="ProductUpgrade" style={{ fontSize: "20px" }} />
+                </div>
+                <span
+                  style={{
+                    background: "#deecf9",
+                    color: "#0078d4",
+                    borderRadius: "12px",
+                    padding: "2px 10px",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                  }}
+                >
+                  Lifecycle
+                </span>
+              </div>
+              <h3 style={{ margin: "0 0 6px 0", fontSize: "18px", color: "#0078d4" }}>Upgradable Components</h3>
+              <p style={{ margin: 0, color: "#605e5c", fontSize: "13px", lineHeight: "1.5" }}>
+                Single view of all workspaces, shared services, workspace services, and user resources with available
+                template upgrades.
               </p>
             </div>
 
@@ -208,6 +272,7 @@ const Admin: React.FC = () => {
       {showOperations && <Operations onClose={() => setShowOperations(false)} />}
       {showTemplates && <Templates onClose={() => setShowTemplates(false)} />}
       {showUserManagement && <UserAccessManagement onClose={() => setShowUserManagement(false)} />}
+      {showUpgrades && <UpgradableResources onClose={() => setShowUpgrades(false)} />}
     </Stack>
   );
 };
