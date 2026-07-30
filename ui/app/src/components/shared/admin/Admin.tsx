@@ -144,7 +144,7 @@ const Admin: React.FC = () => {
                     justifyContent: "center",
                   }}
                 >
-                  <Icon iconName="Upgrade" style={{ fontSize: "20px" }} />
+                  <Icon iconName="Refresh" style={{ fontSize: "20px" }} />
                 </div>
                 <span
                   style={{
