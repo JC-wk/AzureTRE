@@ -327,7 +327,7 @@ export const UpgradableResources: React.FC<UpgradableResourcesProps> = ({ onClos
               color: "#0078d4",
             }}
           >
-            <Icon iconName="ProductUpgrade" style={{ fontSize: "24px", color: "#0078d4" }} /> Upgradable Components &
+            <Icon iconName="Upgrade" style={{ fontSize: "24px", color: "#0078d4" }} /> Upgradable Components &
             Workspaces
           </h2>
           <div style={{ color: "#605e5c", fontSize: "13px", marginTop: "4px" }}>
@@ -358,7 +358,7 @@ export const UpgradableResources: React.FC<UpgradableResourcesProps> = ({ onClos
             }}
           >
             <div style={{ fontSize: "12px", color: "#605e5c", display: "flex", alignItems: "center", gap: "6px" }}>
-              <Icon iconName="ProductUpgrade" style={{ color: "#0078d4", fontSize: "14px" }} />
+              <Icon iconName="Upgrade" style={{ color: "#0078d4", fontSize: "16px" }} />
               <span>Upgradable Components</span>
             </div>
             <div style={{ fontSize: "20px", fontWeight: 600, color: "#0078d4", marginTop: "4px" }}>
