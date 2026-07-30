@@ -60,7 +60,8 @@
   },
   "scripts": {
     "start": "vite",
-    "build": "tsc && vite build",
+    "prebuild": "npm run format",
+    "build": "npm run format && tsc && vite build",
     "serve": "vite preview",
     "test": "vitest",
     "test:coverage": "vitest run --coverage --watch=false",

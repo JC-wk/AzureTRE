@@ -430,9 +430,9 @@ export const UpgradableResources: React.FC<UpgradableResourcesProps> = ({ onClos
           <SearchBox
             placeholder="Search component, template, workspace..."
             value={searchQuery}
-            onChange={(_, val) => setSearchQuery(val || "")}
+            onChange={(e, newValue) => setSearchQuery(newValue ?? (e?.target as HTMLInputElement)?.value ?? "")}
             onClear={() => setSearchQuery("")}
-            styles={{ root: { width: 260 } }}
+            styles={{ root: { width: 300 } }}
           />
 
           <Dropdown

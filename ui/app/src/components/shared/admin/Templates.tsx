@@ -12,6 +12,7 @@ import {
 import { useAuthApiCall, HttpMethod, ResultType } from "../../../hooks/useAuthApiCall";
 import semver from "semver";
 import { ResourceType } from "../../../models/resourceType";
+import TemplateViewerModal from "./TemplateViewerModal";
 
 interface Template {
   id: string;
@@ -56,6 +57,11 @@ const Templates: React.FC<TemplatesProps> = ({ onClose }) => {
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedResourceType, setSelectedResourceType] = useState<string>("all");
+  const [viewingTemplate, setViewingTemplate] = useState<{
+    templateName: string;
+    initialVersion: string;
+    resourceType?: string;
+  } | null>(null);
   const api = useAuthApiCall();
 
   const getTemplateVersionKey = (name: string, version: string) => `${name}::${version}`;
@@ -485,12 +491,25 @@ const Templates: React.FC<TemplatesProps> = ({ onClose }) => {
                             </td>
                             <td style={{ padding: "8px 12px", fontSize: "11px", color: "#666" }}>{template.id}</td>
                             <td style={{ padding: "8px 12px" }}>
-                              <DefaultButton
-                                text="Delete Version"
-                                onClick={() => handleDeleteVersion(template.id, template.name, template.version)}
-                                disabled={isVersionInUse}
-                                title={isVersionInUse ? "Cannot delete template version in use" : undefined}
-                              />
+                              <Stack horizontal tokens={{ childrenGap: 8 }}>
+                                <DefaultButton
+                                  text="View / Diff JSON"
+                                  iconProps={{ iconName: "Code" }}
+                                  onClick={() =>
+                                    setViewingTemplate({
+                                      templateName: template.name,
+                                      initialVersion: template.version,
+                                      resourceType: template.resourceType,
+                                    })
+                                  }
+                                />
+                                <DefaultButton
+                                  text="Delete Version"
+                                  onClick={() => handleDeleteVersion(template.id, template.name, template.version)}
+                                  disabled={isVersionInUse}
+                                  title={isVersionInUse ? "Cannot delete template version in use" : undefined}
+                                />
+                              </Stack>
                             </td>
                           </tr>
                         );
@@ -501,6 +520,16 @@ const Templates: React.FC<TemplatesProps> = ({ onClose }) => {
             );
           })}
         </div>
+      )}
+
+      {/* Template Viewer & Diff Modal */}
+      {viewingTemplate && (
+        <TemplateViewerModal
+          templateName={viewingTemplate.templateName}
+          initialVersion={viewingTemplate.initialVersion}
+          resourceType={viewingTemplate.resourceType}
+          onClose={() => setViewingTemplate(null)}
+        />
       )}
     </Stack>
   );

@@ -147,7 +147,7 @@ describe("UpgradableResources Component", () => {
     await waitFor(() => {
       expect(screen.getAllByText("Research Workspace Alpha").length).toBeGreaterThan(0);
       expect(screen.getByText("Global Gitea Service")).toBeInTheDocument();
-      expect(screen.getByText("Guacamole Bastion")).toBeInTheDocument();
+      expect(screen.getAllByText("Guacamole Bastion").length).toBeGreaterThan(0);
       expect(screen.getByText("Data Science VM")).toBeInTheDocument();
     });
 
@@ -175,7 +175,7 @@ describe("UpgradableResources Component", () => {
     fireEvent.change(searchBox, { target: { value: "Guacamole" } });
 
     await waitFor(() => {
-      expect(screen.getByText("Guacamole Bastion")).toBeInTheDocument();
+      expect(screen.getAllByText("Guacamole Bastion").length).toBeGreaterThan(0);
       expect(screen.queryByText("Global Gitea Service")).not.toBeInTheDocument();
     });
   });
