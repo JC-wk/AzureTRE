@@ -357,8 +357,11 @@ export const UpgradableResources: React.FC<UpgradableResourcesProps> = ({ onClos
               boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
             }}
           >
-            <div style={{ fontSize: "12px", color: "#605e5c" }}>Upgradable Components</div>
-            <div style={{ fontSize: "20px", fontWeight: 600, color: "#0078d4" }}>
+            <div style={{ fontSize: "12px", color: "#605e5c", display: "flex", alignItems: "center", gap: "6px" }}>
+              <Icon iconName="ProductUpgrade" style={{ color: "#0078d4", fontSize: "14px" }} />
+              <span>Upgradable Components</span>
+            </div>
+            <div style={{ fontSize: "20px", fontWeight: 600, color: "#0078d4", marginTop: "4px" }}>
               {stats.totalUpgradable}{" "}
               <span style={{ fontSize: "12px", fontWeight: 400, color: "#605e5c" }}>/ {stats.totalComponents}</span>
             </div>
@@ -373,8 +376,13 @@ export const UpgradableResources: React.FC<UpgradableResourcesProps> = ({ onClos
               borderLeft: "4px solid #0078d4",
             }}
           >
-            <div style={{ fontSize: "12px", color: "#605e5c" }}>Upgradable Workspaces</div>
-            <div style={{ fontSize: "18px", fontWeight: 600, color: "#323130" }}>{stats.workspaces}</div>
+            <div style={{ fontSize: "12px", color: "#605e5c", display: "flex", alignItems: "center", gap: "6px" }}>
+              <Icon iconName="Folder" style={{ color: "#0078d4", fontSize: "14px" }} />
+              <span>Workspaces</span>
+            </div>
+            <div style={{ fontSize: "18px", fontWeight: 600, color: "#323130", marginTop: "4px" }}>
+              {stats.workspaces}
+            </div>
           </div>
 
           <div
@@ -386,8 +394,13 @@ export const UpgradableResources: React.FC<UpgradableResourcesProps> = ({ onClos
               borderLeft: "4px solid #5c2d91",
             }}
           >
-            <div style={{ fontSize: "12px", color: "#605e5c" }}>Workspace Services</div>
-            <div style={{ fontSize: "18px", fontWeight: 600, color: "#323130" }}>{stats.workspaceServices}</div>
+            <div style={{ fontSize: "12px", color: "#605e5c", display: "flex", alignItems: "center", gap: "6px" }}>
+              <Icon iconName="Services" style={{ color: "#5c2d91", fontSize: "14px" }} />
+              <span>Workspace Services</span>
+            </div>
+            <div style={{ fontSize: "18px", fontWeight: 600, color: "#323130", marginTop: "4px" }}>
+              {stats.workspaceServices}
+            </div>
           </div>
 
           <div
@@ -399,8 +412,13 @@ export const UpgradableResources: React.FC<UpgradableResourcesProps> = ({ onClos
               borderLeft: "4px solid #166534",
             }}
           >
-            <div style={{ fontSize: "12px", color: "#605e5c" }}>User Resources</div>
-            <div style={{ fontSize: "18px", fontWeight: 600, color: "#323130" }}>{stats.userResources}</div>
+            <div style={{ fontSize: "12px", color: "#605e5c", display: "flex", alignItems: "center", gap: "6px" }}>
+              <Icon iconName="System" style={{ color: "#166534", fontSize: "14px" }} />
+              <span>User Resources</span>
+            </div>
+            <div style={{ fontSize: "18px", fontWeight: 600, color: "#323130", marginTop: "4px" }}>
+              {stats.userResources}
+            </div>
           </div>
 
           <div
@@ -412,8 +430,13 @@ export const UpgradableResources: React.FC<UpgradableResourcesProps> = ({ onClos
               borderLeft: "4px solid #c2410c",
             }}
           >
-            <div style={{ fontSize: "12px", color: "#605e5c" }}>Shared Services</div>
-            <div style={{ fontSize: "18px", fontWeight: 600, color: "#323130" }}>{stats.sharedServices}</div>
+            <div style={{ fontSize: "12px", color: "#605e5c", display: "flex", alignItems: "center", gap: "6px" }}>
+              <Icon iconName="SharedDatabase" style={{ color: "#c2410c", fontSize: "14px" }} />
+              <span>Shared Services</span>
+            </div>
+            <div style={{ fontSize: "18px", fontWeight: 600, color: "#323130", marginTop: "4px" }}>
+              {stats.sharedServices}
+            </div>
           </div>
         </div>
       )}
