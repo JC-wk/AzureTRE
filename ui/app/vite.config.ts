@@ -23,6 +23,20 @@ export default defineConfig({
   server: {
     port: 3000,
   },
+  build: {
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ["react", "react-dom", "react-router-dom", "react-redux", "@reduxjs/toolkit"],
+          fluentui: ["@fluentui/react"],
+          fluentuiIcons: ["@fluentui/react-file-type-icons"],
+          rjsf: ["@rjsf/core", "@rjsf/fluent-ui", "@rjsf/utils", "@rjsf/validator-ajv8"],
+          azure: ["@azure/msal-browser", "@azure/msal-react"],
+        },
+      },
+    },
+  },
   test: {
     globals: true,
     environment: "jsdom",
