@@ -3,6 +3,11 @@
   "version": "0.8.30",
   "private": true,
   "type": "module",
+  "allowScripts": {
+    "@parcel/watcher": true,
+    "@swc/core": true,
+    "esbuild": true
+  },
   "dependencies": {
     "@azure/msal-browser": "^2.35.0",
     "@azure/msal-react": "^1.5.12",
