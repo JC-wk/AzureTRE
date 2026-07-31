@@ -118,7 +118,7 @@ export const RootLayout: React.FunctionComponent = () => {
         <>
           {loadingCostState === LoadingState.Error && <ExceptionLayout e={costApiError} />}
           <Stack horizontal className="tre-body-inner">
-            <Stack.Item className="tre-left-nav" style={{ marginTop: 2 }}>
+            <Stack.Item className="tre-left-nav">
               <LeftNav />
             </Stack.Item>
             <Stack.Item id="tre-body" className="tre-body-content">
@@ -134,7 +134,16 @@ export const RootLayout: React.FunctionComponent = () => {
                     />
                   }
                 />
-                <Route path="/admin" element={<Admin />} />
+                <Route
+                  path="/admin"
+                  element={
+                    <SecuredByRole
+                      element={<Admin />}
+                      allowedAppRoles={[RoleName.TREAdmin]}
+                      errorString={"You must be a TRE Admin to access this area"}
+                    />
+                  }
+                />
                 <Route
                   path="/shared-services/*"
                   element={
