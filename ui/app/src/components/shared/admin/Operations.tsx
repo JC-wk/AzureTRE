@@ -133,7 +133,7 @@ const Operations: React.FC<OperationsProps> = ({ onClose }) => {
       {loading && <Spinner label="Loading operations..." />}
 
       {!loading && operations.length === 0 && (
-        <div style={{ marginTop: 20, color: "#605e5c" }}>No active or past operations found.</div>
+        <div style={{ marginTop: 20, color: "#605e5c" }}>No active operations found.</div>
       )}
 
       {!loading && operations.length > 0 && filteredOperations.length === 0 && (
