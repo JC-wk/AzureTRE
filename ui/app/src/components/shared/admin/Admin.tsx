@@ -6,6 +6,7 @@ import Templates from "./Templates";
 import UserAccessManagement from "./UserAccessManagement";
 import UpgradableResources from "./UpgradableResources";
 import SystemLogs from "./SystemLogs";
+import AzureLogLinks from "./AzureLogLinks";
 
 const Admin: React.FC = () => {
   const [showOperations, setShowOperations] = useState(false);
@@ -13,6 +14,7 @@ const Admin: React.FC = () => {
   const [showUserManagement, setShowUserManagement] = useState(false);
   const [showUpgrades, setShowUpgrades] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
+  const [showAzureLogLinks, setShowAzureLogLinks] = useState(false);
 
   const location = useLocation();
 
@@ -22,6 +24,7 @@ const Admin: React.FC = () => {
     setShowUserManagement(false);
     setShowUpgrades(false);
     setShowLogs(false);
+    setShowAzureLogLinks(false);
   }, [location.state, location.key]);
 
   return (
@@ -43,7 +46,7 @@ const Admin: React.FC = () => {
           </h1>
           <div style={{ color: "#605e5c", fontSize: "14px", marginTop: "4px" }}>
             Manage resource templates, monitor centralized system logs, inspect deployment state, audit user access
-            matrix, and upgrade components.
+            matrix, generate Azure diagnostic links, and upgrade components.
           </div>
         </div>
       </Stack>
@@ -52,9 +55,14 @@ const Admin: React.FC = () => {
         Warning: These admin functions are advanced and experimental, proceed with caution.
       </p>
 
-      {!showOperations && !showTemplates && !showUserManagement && !showUpgrades && !showLogs && (
+      {!showOperations && !showTemplates && !showUserManagement && !showUpgrades && !showLogs && !showAzureLogLinks && (
         <Stack tokens={{ childrenGap: 20 }}>
-          <Stack horizontal tokens={{ childrenGap: 12 }} styles={{ root: { marginTop: 10 } }}>
+          <Stack horizontal tokens={{ childrenGap: 12 }} styles={{ root: { marginTop: 10, flexWrap: "wrap" } }}>
+            <DefaultButton
+              text="Azure Log Links"
+              iconProps={{ iconName: "CloudSearch" }}
+              onClick={() => setShowAzureLogLinks(true)}
+            />
             <DefaultButton
               text="System Logs"
               iconProps={{ iconName: "Diagnostics" }}
@@ -74,6 +82,56 @@ const Admin: React.FC = () => {
               marginTop: "10px",
             }}
           >
+            <div
+              onClick={() => setShowAzureLogLinks(true)}
+              style={{
+                background: "linear-gradient(135deg, #ffffff 0%, #f0f7ff 100%)",
+                border: "1px solid #0078d460",
+                borderRadius: "8px",
+                padding: "20px",
+                boxShadow: "0 2px 8px rgba(0, 120, 212, 0.15)",
+                cursor: "pointer",
+                transition: "all 0.2s ease-in-out",
+              }}
+              className="tre-admin-card"
+            >
+              <div
+                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}
+              >
+                <div
+                  style={{
+                    background: "#0078d418",
+                    color: "#0078d4",
+                    borderRadius: "50%",
+                    width: "42px",
+                    height: "42px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Icon iconName="CloudSearch" style={{ fontSize: "20px" }} />
+                </div>
+                <span
+                  style={{
+                    background: "#0078d4",
+                    color: "#ffffff",
+                    borderRadius: "12px",
+                    padding: "2px 10px",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                  }}
+                >
+                  Azure Diagnostics
+                </span>
+              </div>
+              <h3 style={{ margin: "0 0 6px 0", fontSize: "18px", color: "#0078d4" }}>Azure Log Links</h3>
+              <p style={{ margin: 0, color: "#605e5c", fontSize: "13px", lineHeight: "1.5" }}>
+                Generate direct Azure Portal Log Analytics links pre-populated with KQL queries for Firewall logs by
+                workspace IP range, Entra ID Sign-In logs by App Registration, and Resource Group cleanups.
+              </p>
+            </div>
+
             <div
               onClick={() => setShowLogs(true)}
               style={{
@@ -327,6 +385,7 @@ const Admin: React.FC = () => {
         </Stack>
       )}
 
+      {showAzureLogLinks && <AzureLogLinks onClose={() => setShowAzureLogLinks(false)} />}
       {showLogs && <SystemLogs onClose={() => setShowLogs(false)} />}
       {showOperations && <Operations onClose={() => setShowOperations(false)} />}
       {showTemplates && <Templates onClose={() => setShowTemplates(false)} />}
