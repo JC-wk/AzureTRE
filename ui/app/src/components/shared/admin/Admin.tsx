@@ -5,12 +5,14 @@ import Operations from "./Operations";
 import Templates from "./Templates";
 import UserAccessManagement from "./UserAccessManagement";
 import UpgradableResources from "./UpgradableResources";
+import SystemLogs from "./SystemLogs";
 
 const Admin: React.FC = () => {
   const [showOperations, setShowOperations] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
   const [showUserManagement, setShowUserManagement] = useState(false);
   const [showUpgrades, setShowUpgrades] = useState(false);
+  const [showLogs, setShowLogs] = useState(false);
 
   const location = useLocation();
 
@@ -19,6 +21,7 @@ const Admin: React.FC = () => {
     setShowTemplates(false);
     setShowUserManagement(false);
     setShowUpgrades(false);
+    setShowLogs(false);
   }, [location.state, location.key]);
 
   return (
@@ -39,8 +42,8 @@ const Admin: React.FC = () => {
             <Icon iconName="Admin" style={{ fontSize: "26px" }} /> Admin
           </h1>
           <div style={{ color: "#605e5c", fontSize: "14px", marginTop: "4px" }}>
-            Manage resource templates, monitor operation logs, inspect deployment state, audit user access matrix, and
-            upgrade components.
+            Manage resource templates, monitor centralized system logs, inspect deployment state, audit user access
+            matrix, and upgrade components.
           </div>
         </div>
       </Stack>
@@ -49,9 +52,14 @@ const Admin: React.FC = () => {
         Warning: These admin functions are advanced and experimental, proceed with caution.
       </p>
 
-      {!showOperations && !showTemplates && !showUserManagement && !showUpgrades && (
+      {!showOperations && !showTemplates && !showUserManagement && !showUpgrades && !showLogs && (
         <Stack tokens={{ childrenGap: 20 }}>
           <Stack horizontal tokens={{ childrenGap: 12 }} styles={{ root: { marginTop: 10 } }}>
+            <DefaultButton
+              text="System Logs"
+              iconProps={{ iconName: "Diagnostics" }}
+              onClick={() => setShowLogs(true)}
+            />
             <DefaultButton text="Templates" onClick={() => setShowTemplates(true)} />
             <DefaultButton text="Upgradable Components" onClick={() => setShowUpgrades(true)} />
             <DefaultButton text="Operations" onClick={() => setShowOperations(true)} />
@@ -66,6 +74,56 @@ const Admin: React.FC = () => {
               marginTop: "10px",
             }}
           >
+            <div
+              onClick={() => setShowLogs(true)}
+              style={{
+                background: "linear-gradient(135deg, #ffffff 0%, #f4f8ff 100%)",
+                border: "1px solid #0078d440",
+                borderRadius: "8px",
+                padding: "20px",
+                boxShadow: "0 2px 8px rgba(0, 120, 212, 0.12)",
+                cursor: "pointer",
+                transition: "all 0.2s ease-in-out",
+              }}
+              className="tre-admin-card"
+            >
+              <div
+                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}
+              >
+                <div
+                  style={{
+                    background: "#0078d418",
+                    color: "#0078d4",
+                    borderRadius: "50%",
+                    width: "42px",
+                    height: "42px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Icon iconName="Diagnostics" style={{ fontSize: "20px" }} />
+                </div>
+                <span
+                  style={{
+                    background: "#0078d4",
+                    color: "#ffffff",
+                    borderRadius: "12px",
+                    padding: "2px 10px",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                  }}
+                >
+                  Centralized Logs
+                </span>
+              </div>
+              <h3 style={{ margin: "0 0 6px 0", fontSize: "18px", color: "#0078d4" }}>System Log Viewer</h3>
+              <p style={{ margin: 0, color: "#605e5c", fontSize: "13px", lineHeight: "1.5" }}>
+                Consolidated real-time operational logs, deployment steps, system events, live auto-refresh, and
+                diagnostic inspector.
+              </p>
+            </div>
+
             <div
               onClick={() => setShowTemplates(true)}
               style={{
@@ -269,6 +327,7 @@ const Admin: React.FC = () => {
         </Stack>
       )}
 
+      {showLogs && <SystemLogs onClose={() => setShowLogs(false)} />}
       {showOperations && <Operations onClose={() => setShowOperations(false)} />}
       {showTemplates && <Templates onClose={() => setShowTemplates(false)} />}
       {showUserManagement && <UserAccessManagement onClose={() => setShowUserManagement(false)} />}

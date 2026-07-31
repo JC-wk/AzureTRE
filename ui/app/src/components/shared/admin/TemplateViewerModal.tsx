@@ -638,10 +638,11 @@ export const TemplateViewerModal: React.FC<TemplateViewerModalProps> = ({
               style={{
                 fontSize: "12px",
                 color: "#605e5c",
-                marginBottom: "12px",
+                marginBottom: "8px",
                 display: "flex",
                 gap: "16px",
                 alignItems: "center",
+                flexShrink: 0,
               }}
             >
               <span>
@@ -652,10 +653,54 @@ export const TemplateViewerModal: React.FC<TemplateViewerModalProps> = ({
             </div>
           )}
 
-          {/* View Container */}
+          {/* Fixed Column Headers for Side-by-Side Mode */}
+          {compareVersion !== "none" && diffMode === "sideBySide" && (
+            <div
+              style={{
+                display: "flex",
+                gap: "12px",
+                marginBottom: "8px",
+                flexShrink: 0,
+              }}
+            >
+              <div
+                style={{
+                  flex: 1,
+                  background: "#252526",
+                  padding: "8px 12px",
+                  fontWeight: 600,
+                  color: "#9cdcfe",
+                  borderRadius: "4px",
+                  borderLeft: "3px solid #0078d4",
+                  fontSize: "12px",
+                  fontFamily: "Consolas, Monaco, 'Courier New', monospace",
+                }}
+              >
+                Base Version: v{selectedVersion}
+              </div>
+              <div
+                style={{
+                  flex: 1,
+                  background: "#252526",
+                  padding: "8px 12px",
+                  fontWeight: 600,
+                  color: "#7ee787",
+                  borderRadius: "4px",
+                  borderLeft: "3px solid #2ea043",
+                  fontSize: "12px",
+                  fontFamily: "Consolas, Monaco, 'Courier New', monospace",
+                }}
+              >
+                Target Version: v{compareVersion}
+              </div>
+            </div>
+          )}
+
+          {/* Scrolling Diff Body */}
           <div
             style={{
               flex: 1,
+              minHeight: 0,
               overflow: "auto",
               background: "#1e1e1e",
               borderRadius: "6px",
@@ -691,47 +736,6 @@ export const TemplateViewerModal: React.FC<TemplateViewerModalProps> = ({
             ) : diffMode === "sideBySide" ? (
               /* Side-by-Side Diff View with Syntax & Code Highlights */
               <div style={{ display: "flex", flexDirection: "column", width: "100%" }}>
-                {/* Headers */}
-                <div
-                  style={{
-                    display: "flex",
-                    gap: "12px",
-                    marginBottom: "8px",
-                    position: "sticky",
-                    top: 0,
-                    zIndex: 2,
-                    background: "#1e1e1e",
-                    paddingBottom: "4px",
-                  }}
-                >
-                  <div
-                    style={{
-                      flex: 1,
-                      background: "#252526",
-                      padding: "6px 12px",
-                      fontWeight: 600,
-                      color: "#9cdcfe",
-                      borderRadius: "4px",
-                      borderLeft: "3px solid #0078d4",
-                    }}
-                  >
-                    Base Version: v{selectedVersion}
-                  </div>
-                  <div
-                    style={{
-                      flex: 1,
-                      background: "#252526",
-                      padding: "6px 12px",
-                      fontWeight: 600,
-                      color: "#7ee787",
-                      borderRadius: "4px",
-                      borderLeft: "3px solid #2ea043",
-                    }}
-                  >
-                    Target Version: v{compareVersion}
-                  </div>
-                </div>
-
                 {/* Side-by-Side Rows */}
                 {sideBySideRows.map((row, idx) => {
                   const leftBg = row.left?.type === "removed" ? "rgba(248, 81, 73, 0.20)" : "transparent";

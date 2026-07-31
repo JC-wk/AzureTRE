@@ -56,7 +56,7 @@ const Operations: React.FC<OperationsProps> = ({ onClose }) => {
     if (!window.confirm("Are you sure you want to delete this operation?")) return;
 
     try {
-      await api(`/admin/operations/${operationId}`, HttpMethod.Delete);
+      await api(`/operations/${operationId}`, HttpMethod.Delete);
       setOperations(operations.filter((op) => op.id !== operationId));
     } catch (error) {
       console.error("Failed to delete operation", error);

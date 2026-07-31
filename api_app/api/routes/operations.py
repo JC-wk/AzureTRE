@@ -17,6 +17,12 @@ async def get_my_operations(user=Depends(require_tre_user_or_admin), operations_
     return OperationInList(operations=operations)
 
 
+@operations_router.get("/operations/all", response_model=OperationInList, name="get_all_operations", dependencies=[Depends(require_tre_admin)])
+async def get_all_operations(operations_repo=Depends(get_repository(OperationRepository)), user=Depends(require_tre_admin)) -> OperationInList:
+    operations = await operations_repo.get_all_operations()
+    return OperationInList(operations=operations)
+
+
 @operations_router.delete("/operations/{operation_id}", name=strings.API_DELETE_OPERATION, status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_tre_admin)])
 async def delete_operation(operation_id: str,
                            operations_repo: OperationRepository = Depends(get_repository(OperationRepository)),

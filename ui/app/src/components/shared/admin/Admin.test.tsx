@@ -40,7 +40,21 @@ vi.mock("./UpgradableResources", () => ({
   UpgradableResources: ({ onClose }: any) => (
     <div data-testid="upgradableresources-component">
       <span>Upgradable Resources Component</span>
-      <button onClick={onClose}>Close Upgradable Resources</button>
+    </div>
+  ),
+}));
+
+vi.mock("./SystemLogs", () => ({
+  default: ({ onClose }: any) => (
+    <div data-testid="systemlogs-component">
+      <span>System Logs Component</span>
+      <button onClick={onClose}>Close System Logs</button>
+    </div>
+  ),
+  SystemLogs: ({ onClose }: any) => (
+    <div data-testid="systemlogs-component">
+      <span>System Logs Component</span>
+      <button onClick={onClose}>Close System Logs</button>
     </div>
   ),
 }));
