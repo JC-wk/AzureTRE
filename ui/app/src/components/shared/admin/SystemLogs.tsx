@@ -56,13 +56,6 @@ const deriveSourceFromPath = (path: string = ""): string => {
   return "System Core";
 };
 
-const formatLocaleDate = (timestampInSeconds: number): string => {
-  if (!timestampInSeconds) return "N/A";
-  const date = new Date(timestampInSeconds * 1000);
-  const userLocale = typeof navigator !== "undefined" && (navigator.languages?.[0] || navigator.language);
-  return date.toLocaleString(userLocale || undefined);
-};
-
 export const SystemLogs: React.FC<SystemLogsProps> = ({ onClose }) => {
   const [operations, setOperations] = useState<Operation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -136,7 +129,7 @@ export const SystemLogs: React.FC<SystemLogsProps> = ({ onClose }) => {
   const handleDownloadLogFile = () => {
     const formattedLogs = filteredOperations
       .map((op) => {
-        const timestamp = new Date(op.updatedWhen * 1000).toISOString();
+        const timestamp = new Date(op.updatedWhen * 1000).toLocaleString();
         const level = getLogLevelInfo(op.status).level;
         const source = deriveSourceFromPath(op.resourcePath);
         return `[${timestamp}] [${level}] [${source}] [OpID:${op.id}] [ResID:${op.resourceId}] [Action:${op.action}] ${op.message || op.status}`;
@@ -438,7 +431,7 @@ export const SystemLogs: React.FC<SystemLogsProps> = ({ onClose }) => {
               {filteredOperations.map((op) => {
                 const logInfo = getLogLevelInfo(op.status);
                 const source = deriveSourceFromPath(op.resourcePath);
-                const timeStr = formatLocaleDate(op.updatedWhen);
+                const timeStr = new Date(op.updatedWhen * 1000).toLocaleString();
 
                 return (
                   <tr key={op.id} style={{ borderBottom: "1px solid #f3f2f1" }}>
@@ -598,10 +591,10 @@ export const SystemLogs: React.FC<SystemLogsProps> = ({ onClose }) => {
                   <strong>User:</strong> {selectedOperation.user?.email || selectedOperation.user?.name || "System"}
                 </div>
                 <div>
-                  <strong>Created:</strong> {formatLocaleDate(selectedOperation.createdWhen)}
+                  <strong>Created:</strong> {new Date(selectedOperation.createdWhen * 1000).toLocaleString()}
                 </div>
                 <div>
-                  <strong>Updated:</strong> {formatLocaleDate(selectedOperation.updatedWhen)}
+                  <strong>Updated:</strong> {new Date(selectedOperation.updatedWhen * 1000).toLocaleString()}
                 </div>
               </div>
 
