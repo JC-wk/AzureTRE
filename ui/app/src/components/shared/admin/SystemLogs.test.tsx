@@ -104,26 +104,23 @@ describe("SystemLogs Component", () => {
     render(<SystemLogs />);
 
     await waitFor(() => {
-      expect(screen.getByText("op-1-deployed")).toBeInTheDocument();
-      expect(screen.getByText("op-2-failed")).toBeInTheDocument();
+      expect(screen.getByText("Workspace successfully deployed")).toBeInTheDocument();
+      expect(screen.getByText("Deployment error in terraform apply")).toBeInTheDocument();
     });
-
-    expect(screen.getByText("Workspace successfully deployed")).toBeInTheDocument();
-    expect(screen.getByText("Deployment error in terraform apply")).toBeInTheDocument();
   });
 
   it("filters logs by search query", async () => {
     render(<SystemLogs />);
 
     await waitFor(() => {
-      expect(screen.getByText("op-1-deployed")).toBeInTheDocument();
+      expect(screen.getByText("Workspace successfully deployed")).toBeInTheDocument();
     });
 
     const searchInput = screen.getByTestId("search-box");
     fireEvent.change(searchInput, { target: { value: "failed" } });
 
-    expect(screen.queryByText("op-1-deployed")).not.toBeInTheDocument();
-    expect(screen.getByText("op-2-failed")).toBeInTheDocument();
+    expect(screen.queryByText("Workspace successfully deployed")).not.toBeInTheDocument();
+    expect(screen.getByText("Deployment error in terraform apply")).toBeInTheDocument();
   });
 
   it("calls onClose when close button is clicked", async () => {
@@ -136,5 +133,28 @@ describe("SystemLogs Component", () => {
 
     fireEvent.click(screen.getByTestId("button-close"));
     expect(handleClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("opens inspector modal with Open in Azure Log Analytics button", async () => {
+    const windowOpenSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+    render(<SystemLogs />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText("Inspect")[0]).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getAllByText("Inspect")[0]);
+
+    await waitFor(() => {
+      expect(screen.getByText("Open in Azure Log Analytics")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText("Open in Azure Log Analytics"));
+    expect(windowOpenSpy).toHaveBeenCalledWith(
+      expect.stringContaining("portal.azure.com"),
+      "_blank",
+      "noopener,noreferrer",
+    );
+    windowOpenSpy.mockRestore();
   });
 });

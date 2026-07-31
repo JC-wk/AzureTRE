@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from api.helpers import get_repository
 from db.errors import EntityDoesNotExist
@@ -18,8 +18,8 @@ async def get_my_operations(user=Depends(require_tre_user_or_admin), operations_
 
 
 @operations_router.get("/operations/all", response_model=OperationInList, name="get_all_operations", dependencies=[Depends(require_tre_admin)])
-async def get_all_operations(operations_repo=Depends(get_repository(OperationRepository)), user=Depends(require_tre_admin)) -> OperationInList:
-    operations = await operations_repo.get_all_operations()
+async def get_all_operations(limit: int = Query(default=100, ge=1, le=1000), operations_repo=Depends(get_repository(OperationRepository)), user=Depends(require_tre_admin)) -> OperationInList:
+    operations = await operations_repo.get_all_operations(limit=limit)
     return OperationInList(operations=operations)
 
 

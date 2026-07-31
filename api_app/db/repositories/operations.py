@@ -190,8 +190,8 @@ class OperationRepository(BaseRepository):
         operations = await self.query(query=query)
         return parse_obj_as(List[Operation], operations)
 
-    async def get_all_operations(self) -> List[Operation]:
-        query = self.operations_query() + ' 1=1 ORDER BY c.updatedWhen DESC'
+    async def get_all_operations(self, limit: int = 100) -> List[Operation]:
+        query = f'SELECT TOP {limit} * FROM c ORDER BY c.updatedWhen DESC'
         operations = await self.query(query=query)
         return parse_obj_as(List[Operation], operations)
 

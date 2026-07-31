@@ -63,28 +63,33 @@ export const SystemLogs: React.FC<SystemLogsProps> = ({ onClose }) => {
   const [selectedLevelFilter, setSelectedLevelFilter] = useState<string>("all");
   const [selectedSourceFilter, setSelectedSourceFilter] = useState<string>("all");
   const [selectedTimeFilter, setSelectedTimeFilter] = useState<string>("all");
+  const [limit, setLimit] = useState<number>(100);
   const [selectedOperation, setSelectedOperation] = useState<Operation | null>(null);
   const [autoRefreshInterval, setAutoRefreshInterval] = useState<number>(0); // 0 = off
   const [copySuccess, setCopySuccess] = useState(false);
 
   const api = useAuthApiCall();
 
-  const fetchLogs = useCallback(async () => {
-    try {
-      // Try /operations/all (TRE Admin endpoint) first, fallback to /operations
-      let data;
+  const fetchLogs = useCallback(
+    async (fetchLimit: number = limit) => {
+      setLoading(true);
       try {
-        data = await api("/operations/all", HttpMethod.Get);
-      } catch {
-        data = await api("/operations", HttpMethod.Get);
+        // Try /operations/all (TRE Admin endpoint) first, fallback to /operations
+        let data;
+        try {
+          data = await api(`/operations/all?limit=${fetchLimit}`, HttpMethod.Get);
+        } catch {
+          data = await api(`/operations?limit=${fetchLimit}`, HttpMethod.Get);
+        }
+        setOperations(data.operations || []);
+      } catch (error) {
+        console.error("Failed to fetch system logs", error);
+      } finally {
+        setLoading(false);
       }
-      setOperations(data.operations || []);
-    } catch (error) {
-      console.error("Failed to fetch system logs", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [api]);
+    },
+    [api, limit],
+  );
 
   useEffect(() => {
     fetchLogs();
@@ -139,6 +144,10 @@ export const SystemLogs: React.FC<SystemLogsProps> = ({ onClose }) => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const getAzureLogAnalyticsUrl = (opId: string) => {
+    return `https://portal.azure.com/#blade/Microsoft_Azure_Monitoring_Logs/LogsBlade/query/Traces%20%7C%20where%20message%20contains%20%22${opId}%22`;
   };
 
   // Filtering logic
@@ -208,6 +217,12 @@ export const SystemLogs: React.FC<SystemLogsProps> = ({ onClose }) => {
     { key: "30d", text: "Last 30 Days" },
   ];
 
+  const limitDropdownOptions: IDropdownOption[] = [
+    { key: 100, text: "100 Recent Logs" },
+    { key: 250, text: "250 Recent Logs" },
+    { key: 500, text: "500 Recent Logs" },
+  ];
+
   return (
     <Stack className="tre-panel tre-resource-panel" tokens={{ childrenGap: 16 }}>
       {/* Title & Header Bar */}
@@ -231,7 +246,7 @@ export const SystemLogs: React.FC<SystemLogsProps> = ({ onClose }) => {
           </div>
         </div>
         <Stack horizontal tokens={{ childrenGap: 8 }}>
-          <DefaultButton iconProps={{ iconName: "Refresh" }} text="Refresh Logs" onClick={fetchLogs} />
+          <DefaultButton iconProps={{ iconName: "Refresh" }} text="Refresh Logs" onClick={() => fetchLogs()} />
           {onClose && <DefaultButton iconProps={{ iconName: "Cancel" }} text="Close" onClick={onClose} />}
         </Stack>
       </Stack>
@@ -360,6 +375,18 @@ export const SystemLogs: React.FC<SystemLogsProps> = ({ onClose }) => {
           onChange={(_, opt) => setSelectedTimeFilter((opt?.key as string) || "all")}
           options={timeDropdownOptions}
           styles={{ root: { width: 170 } }}
+        />
+
+        <Dropdown
+          label="Max Logs"
+          selectedKey={limit}
+          onChange={(_, opt) => {
+            const newLimit = (opt?.key as number) || 100;
+            setLimit(newLimit);
+            fetchLogs(newLimit);
+          }}
+          options={limitDropdownOptions}
+          styles={{ root: { width: 160 } }}
         />
       </Stack>
 
@@ -516,7 +543,17 @@ export const SystemLogs: React.FC<SystemLogsProps> = ({ onClose }) => {
               >
                 <Icon iconName="Diagnostics" /> Log Details & Inspector
               </h3>
-              <IconButton iconProps={{ iconName: "Cancel" }} onClick={() => setSelectedOperation(null)} />
+              <Stack horizontal tokens={{ childrenGap: 8 }} verticalAlign="center">
+                <DefaultButton
+                  iconProps={{ iconName: "OpenInNewWindow" }}
+                  text="Open in Azure Log Analytics"
+                  onClick={() =>
+                    window.open(getAzureLogAnalyticsUrl(selectedOperation.id), "_blank", "noopener,noreferrer")
+                  }
+                  styles={{ root: { color: "#0078d4" } }}
+                />
+                <IconButton iconProps={{ iconName: "Cancel" }} onClick={() => setSelectedOperation(null)} />
+              </Stack>
             </Stack>
 
             <Stack tokens={{ childrenGap: 16 }}>
