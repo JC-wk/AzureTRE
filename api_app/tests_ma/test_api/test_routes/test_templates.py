@@ -1,32 +1,16 @@
 import pytest
 from httpx import AsyncClient
 from mock import MagicMock, AsyncMock, patch
+from fastapi import HTTPException, status
 
-from db.repositories.operations import OperationRepository
 from db.repositories.resource_templates import ResourceTemplateRepository
-from models.domain.operation import Operation
 from models.domain.resource import ResourceType
-from services.authentication import get_current_admin_user
-from tests_ma.test_api.conftest import create_admin_user, create_non_admin_user, create_test_user
-from resources import strings
+from auth.rbac import require_tre_admin
+from tests_ma.test_api.conftest import create_admin_user
 
 
-@pytest.fixture
-def operation() -> Operation:
-    operation = Operation(
-        id="123",
-        resourceId="123",
-        resourcePath="/workspaces/123",
-        resourceVersion=0,
-        status="awaiting_deployment",
-        action="install",
-        message="",
-        createdWhen=0,
-        updatedWhen=0,
-        user=create_test_user(),
-        steps=[],
-    )
-    return operation
+def forbidden():
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
 
 
 @pytest.fixture
@@ -62,41 +46,10 @@ def sample_templates() -> list:
     ]
 
 
-@pytest.mark.asyncio
-async def test_delete_operation_as_admin_returns_204(app, client: AsyncClient, operation: Operation):
-    app.dependency_overrides[get_current_admin_user] = create_admin_user
-
-    mock_repo = MagicMock()
-    mock_repo.get_operation_by_id = AsyncMock(return_value=operation)
-    mock_repo.delete_operation = AsyncMock()
-
-    with patch.object(OperationRepository, 'create', return_value=mock_repo):
-        url = app.url_path_for(strings.API_DELETE_OPERATION, operation_id=operation.id)
-        response = await client.delete(url, headers={"Authorization": "Bearer token"})
-        assert response.status_code == 204
-
-    app.dependency_overrides = {}
-
-
-@pytest.mark.asyncio
-async def test_delete_operation_as_user_returns_403(app, client: AsyncClient, operation: Operation):
-    app.dependency_overrides[get_current_admin_user] = create_non_admin_user
-
-    mock_repo = MagicMock()
-    mock_repo.get_operation_by_id = AsyncMock(return_value=operation)
-
-    with patch.object(OperationRepository, 'create', return_value=mock_repo):
-        url = app.url_path_for(strings.API_DELETE_OPERATION, operation_id=operation.id)
-        response = await client.delete(url, headers={"Authorization": "Bearer token"})
-        assert response.status_code == 403
-
-    app.dependency_overrides = {}
-
-
-# Tests for GET /admin/templates
+# Tests for GET /templates
 @pytest.mark.asyncio
 async def test_get_all_templates_as_admin_returns_200_with_templates(app, client: AsyncClient, sample_templates: list):
-    app.dependency_overrides[get_current_admin_user] = create_admin_user
+    app.dependency_overrides[require_tre_admin] = create_admin_user
 
     mock_repo = MagicMock()
     mock_repo.get_all_templates = AsyncMock(return_value=sample_templates)
@@ -114,7 +67,7 @@ async def test_get_all_templates_as_admin_returns_200_with_templates(app, client
 
 @pytest.mark.asyncio
 async def test_get_all_templates_as_admin_returns_empty_list_when_no_templates(app, client: AsyncClient):
-    app.dependency_overrides[get_current_admin_user] = create_admin_user
+    app.dependency_overrides[require_tre_admin] = create_admin_user
 
     mock_repo = MagicMock()
     mock_repo.get_all_templates = AsyncMock(return_value=[])
@@ -129,7 +82,7 @@ async def test_get_all_templates_as_admin_returns_empty_list_when_no_templates(a
 
 @pytest.mark.asyncio
 async def test_get_all_templates_as_non_admin_returns_403(app, client: AsyncClient):
-    app.dependency_overrides[get_current_admin_user] = create_non_admin_user
+    app.dependency_overrides[require_tre_admin] = forbidden
 
     response = await client.get(app.url_path_for("get_all_templates"), headers={"Authorization": "Bearer token"})
     assert response.status_code == 403
@@ -137,10 +90,10 @@ async def test_get_all_templates_as_non_admin_returns_403(app, client: AsyncClie
     app.dependency_overrides = {}
 
 
-# Tests for DELETE /admin/templates/{template_id}
+# Tests for DELETE /templates/{template_id}
 @pytest.mark.asyncio
 async def test_delete_template_by_id_as_admin_returns_204(app, client: AsyncClient):
-    app.dependency_overrides[get_current_admin_user] = create_admin_user
+    app.dependency_overrides[require_tre_admin] = create_admin_user
 
     mock_repo = MagicMock()
     mock_repo.delete_template_by_id = AsyncMock()
@@ -156,7 +109,7 @@ async def test_delete_template_by_id_as_admin_returns_204(app, client: AsyncClie
 
 @pytest.mark.asyncio
 async def test_delete_template_by_id_as_non_admin_returns_403(app, client: AsyncClient):
-    app.dependency_overrides[get_current_admin_user] = create_non_admin_user
+    app.dependency_overrides[require_tre_admin] = forbidden
 
     url = app.url_path_for("delete_template_by_id", template_id="test-template-id")
     response = await client.delete(url, headers={"Authorization": "Bearer token"})
@@ -167,7 +120,7 @@ async def test_delete_template_by_id_as_non_admin_returns_403(app, client: Async
 
 @pytest.mark.asyncio
 async def test_delete_template_by_id_returns_404_when_template_not_found(app, client: AsyncClient):
-    app.dependency_overrides[get_current_admin_user] = create_admin_user
+    app.dependency_overrides[require_tre_admin] = create_admin_user
 
     mock_repo = MagicMock()
     mock_repo.delete_template_by_id = AsyncMock(side_effect=Exception("Template not found"))
@@ -181,10 +134,10 @@ async def test_delete_template_by_id_returns_404_when_template_not_found(app, cl
     app.dependency_overrides = {}
 
 
-# Tests for DELETE /admin/templates/{resource_type}/{template_name}
+# Tests for DELETE /templates/{resource_type}/{template_name}
 @pytest.mark.asyncio
 async def test_delete_templates_by_name_as_admin_returns_200_with_count(app, client: AsyncClient):
-    app.dependency_overrides[get_current_admin_user] = create_admin_user
+    app.dependency_overrides[require_tre_admin] = create_admin_user
 
     mock_repo = MagicMock()
     mock_repo.delete_templates_by_name = AsyncMock(return_value=3)
@@ -203,7 +156,7 @@ async def test_delete_templates_by_name_as_admin_returns_200_with_count(app, cli
 
 @pytest.mark.asyncio
 async def test_delete_templates_by_name_as_admin_returns_zero_when_no_templates_found(app, client: AsyncClient):
-    app.dependency_overrides[get_current_admin_user] = create_admin_user
+    app.dependency_overrides[require_tre_admin] = create_admin_user
 
     mock_repo = MagicMock()
     mock_repo.delete_templates_by_name = AsyncMock(return_value=0)
@@ -220,7 +173,7 @@ async def test_delete_templates_by_name_as_admin_returns_zero_when_no_templates_
 
 @pytest.mark.asyncio
 async def test_delete_templates_by_name_as_non_admin_returns_403(app, client: AsyncClient):
-    app.dependency_overrides[get_current_admin_user] = create_non_admin_user
+    app.dependency_overrides[require_tre_admin] = forbidden
 
     url = app.url_path_for("delete_templates_by_name", resource_type=ResourceType.Workspace, template_name="tre-workspace-base")
     response = await client.delete(url, headers={"Authorization": "Bearer token"})
@@ -231,7 +184,7 @@ async def test_delete_templates_by_name_as_non_admin_returns_403(app, client: As
 
 @pytest.mark.asyncio
 async def test_delete_templates_by_name_returns_500_on_error(app, client: AsyncClient):
-    app.dependency_overrides[get_current_admin_user] = create_admin_user
+    app.dependency_overrides[require_tre_admin] = create_admin_user
 
     mock_repo = MagicMock()
     mock_repo.delete_templates_by_name = AsyncMock(side_effect=Exception("Database error"))
@@ -247,7 +200,7 @@ async def test_delete_templates_by_name_returns_500_on_error(app, client: AsyncC
 
 @pytest.mark.asyncio
 async def test_delete_templates_by_name_works_for_different_resource_types(app, client: AsyncClient):
-    app.dependency_overrides[get_current_admin_user] = create_admin_user
+    app.dependency_overrides[require_tre_admin] = create_admin_user
 
     mock_repo = MagicMock()
     mock_repo.delete_templates_by_name = AsyncMock(return_value=2)
