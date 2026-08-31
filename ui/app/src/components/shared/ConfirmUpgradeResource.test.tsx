@@ -207,7 +207,13 @@ describe("ConfirmUpgradeResource Component", () => {
   });
 
   it("shows loading spinner during API call", async () => {
-    mockApiCall.mockImplementation(() => new Promise((resolve) => setTimeout(resolve, 100)));
+    let resolveApiCall: (value?: any) => void;
+    mockApiCall.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveApiCall = resolve;
+        }),
+    );
 
     renderWithWorkspaceContext(<ConfirmUpgradeResource resource={mockResource} onDismiss={mockOnDismiss} />);
 
@@ -220,6 +226,10 @@ describe("ConfirmUpgradeResource Component", () => {
 
     expect(screen.getByTestId("spinner")).toBeInTheDocument();
     expect(screen.getByText("Sending request...")).toBeInTheDocument();
+
+    // Resolve promise so component finishes async handler before test teardown
+    resolveApiCall!({ operation: { id: "op-id" } });
+    await waitFor(() => expect(mockOnDismiss).toHaveBeenCalled());
   });
 
   it("displays error when API call fails", async () => {

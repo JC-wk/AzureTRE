@@ -190,6 +190,11 @@ class OperationRepository(BaseRepository):
         operations = await self.query(query=query)
         return TypeAdapter(List[Operation]).validate_python(operations)
 
+    async def get_all_operations(self, limit: int = 100) -> List[Operation]:
+        query = f'SELECT TOP {limit} * FROM c ORDER BY c.updatedWhen DESC'
+        operations = await self.query(query=query)
+        return parse_obj_as(List[Operation], operations)
+
     async def resource_has_deployed_operation(self, resource_id: str) -> bool:
         query = self.operations_query() + f' c.resourceId = "{resource_id}" AND ((c.action = "{RequestAction.Install}" AND c.status = "{Status.Deployed}") OR (c.action = "{RequestAction.Upgrade}" AND c.status = "{Status.Updated}"))'
         operations = await self.query(query=query)
