@@ -14,6 +14,7 @@ from azure.core.exceptions import HttpResponseError
 from db.errors import EntityDoesNotExist, InvalidInput, ResourceIsNotDeployed, StorageAccountNameGenerationTimeout, StorageAccountNameCheckFailed
 from db.repositories.resource_templates import ResourceTemplateRepository
 from db.repositories.resources import ResourceRepository
+from db.repositories.workspace_address_allocations import WorkspaceAddressAllocationRepository
 from models.domain.operation import Status
 from db.repositories.operations import OperationRepository
 from models.domain.resource import ResourceType
@@ -36,6 +37,7 @@ class WorkspaceRepository(ResourceRepository):
     async def create(cls):
         cls = WorkspaceRepository()
         await super().create()
+        cls.workspace_address_allocations_repo = await WorkspaceAddressAllocationRepository.create()
         return cls
 
     @staticmethod
@@ -186,6 +188,7 @@ class WorkspaceRepository(ResourceRepository):
         networks = [[x.properties.get("address_space")] for x in workspaces]
         networks = networks + [x.properties.get("address_spaces", []) for x in workspaces]
         networks = [i for s in networks for i in s if i is not None]
+        networks += await self.workspace_address_allocations_repo.get_active_address_spaces()
 
         new_address_space = generate_new_cidr(networks, cidr_netmask)
         return new_address_space
