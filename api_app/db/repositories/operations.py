@@ -49,7 +49,7 @@ class OperationRepository(BaseRepository):
             message=message,
             updatedWhen=self.get_timestamp())
 
-    async def create_operation_item(self, resource_id: str, resource_list: List, action: str, resource_path: str, resource_version: int, user: User, resource_repo: ResourceRepository, resource_template_repo: ResourceTemplateRepository) -> Operation:
+    async def create_operation_item(self, resource_id: str, resource_list: List, action: str, resource_path: str, resource_version: int, user: User, resource_repo: ResourceRepository, resource_template_repo: ResourceTemplateRepository, workspace_address_allocation_id: str = None) -> Operation:
         operation_id = self.create_operation_id()
 
         # get the right "awaiting" message based on the action
@@ -94,7 +94,8 @@ class OperationRepository(BaseRepository):
             action=action,
             message=message,
             user=user.model_dump(),
-            steps=all_steps
+            steps=all_steps,
+            workspaceAddressAllocationId=workspace_address_allocation_id
         )
 
         await self.save_item(operation)

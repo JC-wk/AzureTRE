@@ -18,7 +18,12 @@ from db.repositories.operations import OperationRepository
 from core import config, credentials
 from db.errors import EntityDoesNotExist
 from db.repositories.resources import ResourceRepository
+from db.repositories.workspace_address_allocations import WorkspaceAddressAllocationRepository
+from models.domain.authentication import User
 from models.domain.operation import DeploymentStatusUpdateMessage, Operation, OperationStep, Status
+from models.domain.resource import ResourceType
+from models.domain.workspace_address_allocation import WorkspaceAddressAllocationState
+from service_bus.resource_request_sender import send_resource_request_message
 from resources import strings
 from services.logging import logger, tracer
 
@@ -32,6 +37,7 @@ class DeploymentStatusUpdater():
         self.resource_repo = await ResourceRepository.create()
         self.resource_template_repo = await ResourceTemplateRepository.create()
         self.resource_history_repo = await ResourceHistoryRepository.create()
+        self.workspace_address_allocations_repo = await WorkspaceAddressAllocationRepository.create()
 
     def run(self, *args, **kwargs):
         asyncio.run(self.receive_messages())
@@ -162,9 +168,15 @@ class DeploymentStatusUpdater():
                 return True
 
             # update the resource doc to persist any outputs
-            resource = await self.resource_repo.get_resource_dict_by_id(resource_id)
-            resource_to_persist = self.create_updated_resource_document(resource, message)
+            resource_document = await self.resource_repo.get_resource_dict_by_id(resource_id)
+            resource_to_persist = self.create_updated_resource_document(resource_document, message)
             await self.resource_repo.update_item_dict(resource_to_persist)
+
+            if is_last_step and operation.action == RequestAction.UnInstall and resource.resourceType == ResourceType.WorkspaceService:
+                await self.reconcile_workspace_address_allocation(resource, operation)
+
+            if is_last_step and operation.action == RequestAction.Upgrade and operation.workspaceAddressAllocationId:
+                await self.finalize_workspace_address_allocation(operation)
 
             # more steps in the op to do?
             if is_last_step is False:
@@ -207,6 +219,46 @@ class DeploymentStatusUpdater():
             logger.exception("Failed to update status")
 
         return result
+
+    async def reconcile_workspace_address_allocation(self, workspace_service, uninstall_operation: Operation):
+        allocation = await self.workspace_address_allocations_repo.get_by_workspace_service_id(workspace_service.id)
+        if allocation is None or allocation.state == WorkspaceAddressAllocationState.Released:
+            return
+
+        if allocation.state == WorkspaceAddressAllocationState.Releasing:
+            allocation = await self.workspace_address_allocations_repo.update_state(
+                allocation, WorkspaceAddressAllocationState.ReleaseReady, uninstall_operation.id)
+
+        if allocation.cleanupOperationId:
+            cleanup_operation = await self.operations_repo.get_operation_by_id(allocation.cleanupOperationId)
+            if cleanup_operation.status not in (Status.UpdatingFailed, Status.ActionFailed):
+                return
+
+        workspace = await self.resource_repo.get_resource_by_id(uuid.UUID(workspace_service.workspaceId))
+        current_address_spaces = workspace.properties.get("address_spaces", [])
+        desired_address_spaces = [address for address in current_address_spaces if address != allocation.addressSpace]
+        workspace.properties["address_spaces"] = desired_address_spaces
+        await self.resource_repo.update_item_with_etag(workspace, workspace.etag)
+
+        cleanup_operation = await send_resource_request_message(
+            resource=workspace,
+            operations_repo=self.operations_repo,
+            resource_repo=self.resource_repo,
+            user=TypeAdapter(User).validate_python(uninstall_operation.user),
+            resource_template_repo=self.resource_template_repo,
+            resource_history_repo=self.resource_history_repo,
+            action=RequestAction.Upgrade,
+            workspace_address_allocation_id=allocation.id)
+        allocation.cleanupOperationId = cleanup_operation.id
+        await self.workspace_address_allocations_repo.update_state(
+            allocation, WorkspaceAddressAllocationState.ReleaseReady)
+
+    async def finalize_workspace_address_allocation(self, operation: Operation):
+        allocation = await self.workspace_address_allocations_repo.get_by_workspace_service_id(
+            operation.workspaceAddressAllocationId)
+        if allocation and allocation.state != WorkspaceAddressAllocationState.Released:
+            await self.workspace_address_allocations_repo.update_state(
+                allocation, WorkspaceAddressAllocationState.Released, operation.id)
 
     async def update_overall_operation_status(self, operation: Operation, step: OperationStep, is_last_step: bool):
         operation.updatedWhen = get_timestamp()

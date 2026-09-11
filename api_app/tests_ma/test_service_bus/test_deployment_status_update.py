@@ -8,6 +8,8 @@ import uuid
 from tests_ma.test_api.test_routes.test_resource_helpers import FAKE_CREATE_TIMESTAMP, FAKE_UPDATE_TIMESTAMP
 from models.domain.request_action import RequestAction
 from models.domain.resource import ResourceType
+from models.domain.workspace_service import WorkspaceService
+from models.domain.workspace_address_allocation import WorkspaceAddressAllocation, WorkspaceAddressAllocationState
 
 from db.errors import EntityDoesNotExist
 from models.domain.workspace import Workspace
@@ -501,3 +503,72 @@ async def test_convert_outputs_to_dict():
         'list2': ['one', 'two']
     }
     assert status_updater.convert_outputs_to_dict(deployment_status_update_message.outputs) == expected_result
+
+
+async def test_reconcile_workspace_address_allocation_dispatches_workspace_upgrade():
+    workspace_id = str(uuid.uuid4())
+    service_id = str(uuid.uuid4())
+    workspace_service = WorkspaceService(
+        id=service_id,
+        workspaceId=workspace_id,
+        templateName="workspace-service",
+        templateVersion="1.0.0",
+        properties={"address_space": "10.1.4.0/24"},
+        resourceType=ResourceType.WorkspaceService,
+        resourcePath=f"/workspaces/{workspace_id}/workspace-services/{service_id}",
+        etag="service-etag")
+    workspace = create_sample_workspace_object(workspace_id)
+    workspace.properties = {"address_spaces": ["10.1.4.0/24", "10.1.5.0/24"]}
+    workspace.etag = "workspace-etag"
+    allocation = WorkspaceAddressAllocation(
+        id=service_id,
+        workspaceId=workspace_id,
+        workspaceServiceId=service_id,
+        addressSpace="10.1.4.0/24",
+        state=WorkspaceAddressAllocationState.Releasing,
+        etag="allocation-etag")
+    uninstall_operation = create_sample_operation(service_id, RequestAction.UnInstall)
+    uninstall_operation.user = {"id": "user-id", "name": "user", "roles": []}
+    cleanup_operation = create_sample_operation(workspace_id, RequestAction.Upgrade)
+
+    status_updater = DeploymentStatusUpdater()
+    status_updater.resource_repo = AsyncMock()
+    status_updater.operations_repo = AsyncMock()
+    status_updater.resource_template_repo = AsyncMock()
+    status_updater.resource_history_repo = AsyncMock()
+    status_updater.workspace_address_allocations_repo = AsyncMock()
+    status_updater.workspace_address_allocations_repo.get_by_workspace_service_id.return_value = allocation
+    status_updater.workspace_address_allocations_repo.update_state.side_effect = lambda item, state, operation_id=None: item
+    status_updater.resource_repo.get_resource_by_id.return_value = workspace
+
+    with patch("service_bus.deployment_status_updater.send_resource_request_message", new_callable=AsyncMock, return_value=cleanup_operation) as send_message:
+        await status_updater.reconcile_workspace_address_allocation(workspace_service, uninstall_operation)
+
+    assert workspace.properties["address_spaces"] == ["10.1.5.0/24"]
+    status_updater.resource_repo.update_item_with_etag.assert_awaited_once_with(workspace, "workspace-etag")
+    send_message.assert_awaited_once()
+    assert send_message.call_args.kwargs["action"] == RequestAction.Upgrade
+    assert send_message.call_args.kwargs["workspace_address_allocation_id"] == service_id
+    assert allocation.cleanupOperationId == cleanup_operation.id
+
+
+async def test_finalize_workspace_address_allocation_marks_released():
+    allocation = WorkspaceAddressAllocation(
+        id=str(uuid.uuid4()),
+        workspaceId=str(uuid.uuid4()),
+        workspaceServiceId=str(uuid.uuid4()),
+        addressSpace="10.1.4.0/24",
+        state=WorkspaceAddressAllocationState.ReleaseReady,
+        etag="allocation-etag")
+    operation = create_sample_operation(str(uuid.uuid4()), RequestAction.Upgrade)
+    operation.workspaceAddressAllocationId = allocation.id
+
+    status_updater = DeploymentStatusUpdater()
+    status_updater.workspace_address_allocations_repo = AsyncMock()
+    status_updater.workspace_address_allocations_repo.get_by_workspace_service_id.return_value = allocation
+    status_updater.workspace_address_allocations_repo.update_state.return_value = allocation
+
+    await status_updater.finalize_workspace_address_allocation(operation)
+
+    status_updater.workspace_address_allocations_repo.update_state.assert_awaited_once_with(
+        allocation, WorkspaceAddressAllocationState.Released, operation.id)

@@ -94,6 +94,7 @@ class Operation(AzureTREModel):
     updatedWhen: float = Field(0.0, title="POSIX Timestamp for When the operation was updated")
     user: dict = Field(default_factory=dict)
     steps: Optional[List[OperationStep]] = Field(None, title="Operation Steps")
+    workspaceAddressAllocationId: Optional[str] = None
 
     @field_validator("user", mode="before")
     @classmethod
