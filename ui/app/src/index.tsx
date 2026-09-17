@@ -1,5 +1,5 @@
 import { App } from "./App";
-import { mergeStyles } from "@fluentui/react";
+import { initializeIcons, mergeStyles } from "@fluentui/react";
 import reportWebVitals from "./reportWebVitals";
 import { BrowserRouter } from "react-router-dom";
 import { pca } from "./authConfig";
@@ -7,6 +7,9 @@ import { MsalProvider } from "@azure/msal-react";
 import { Provider } from "react-redux";
 import { store } from "./store/store";
 import { createRoot } from "react-dom/client";
+
+// Initialize Fluent UI Icon Font Set
+initializeIcons();
 
 // Inject some global styles
 mergeStyles({
