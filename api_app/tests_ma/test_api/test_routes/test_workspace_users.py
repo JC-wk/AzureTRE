@@ -36,7 +36,7 @@ def sample_workspace(workspace_id=WORKSPACE_ID, auth_info: dict = {}) -> Workspa
         },
         resourcePath=f'/workspaces/{workspace_id}',
         updatedWhen=FAKE_CREATE_TIMESTAMP,
-        user=create_admin_user()
+        user=create_admin_user().model_dump()
     )
     if auth_info:
         workspace.properties = {**auth_info}
@@ -45,7 +45,8 @@ def sample_workspace(workspace_id=WORKSPACE_ID, auth_info: dict = {}) -> Workspa
 
 class TestWorkspaceUserRoutesWithTreAdmin:
     @pytest.fixture(autouse=True, scope='class')
-    def _prepare(self, app, admin_user):
+    @classmethod
+    def _prepare(cls, app, admin_user):
         app.dependency_overrides[require_workspace_owner_or_researcher_or_airlock_manager_or_tre_admin] = admin_user
         app.dependency_overrides[require_tre_user_or_admin] = admin_user
         app.dependency_overrides[require_tre_admin] = admin_user

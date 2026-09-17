@@ -1,6 +1,5 @@
 import time
 import pytest
-import pytest_asyncio
 from mock import patch
 from fastapi import status
 from azure.core.exceptions import HttpResponseError
@@ -33,14 +32,16 @@ AIRLOCK_REVIEW_ID = "11bd2526-054b-4305-a7f9-63a2d6d2a80c"
 def sample_airlock_request_input_data():
     return {
         "type": "import",
-        "businessJustification": "some business justification"
+        "title": "a request title",
+        "businessJustification": "some business justification",
+        "properties": {}
     }
 
 
 @pytest.fixture
 def sample_airlock_review_input_data():
     return {
-        "reviewDecision": "approved",
+        "approval": True,
         "decisionExplanation": "the reason why this request was approved/rejected"
     }
 
@@ -127,8 +128,9 @@ def create_test_user_with_roles(roles):
 
 
 class TestAirlockRoutesThatRequireOwnerOrResearcherRights():
-    @pytest_asyncio.fixture(autouse=True, scope='class')
-    def log_in_with_researcher_user(self, app, researcher_user):
+    @pytest.fixture(autouse=True, scope='class')
+    @classmethod
+    def log_in_with_researcher_user(cls, app, researcher_user):
         app.dependency_overrides[require_workspace_owner_or_researcher] = researcher_user
         app.dependency_overrides[require_workspace_owner_or_researcher_or_airlock_manager] = researcher_user
         with patch("api.routes.airlock.AirlockRequestRepository.create_airlock_request_item", return_value=sample_airlock_request_object()), \
@@ -303,8 +305,9 @@ class TestAirlockRoutesThatRequireOwnerOrResearcherRights():
 
 
 class TestAirlockRoutesThatRequireAirlockManagerRights():
-    @pytest_asyncio.fixture(autouse=True, scope='class')
-    def log_in_with_airlock_manager_user(self, app, airlock_manager_user):
+    @pytest.fixture(autouse=True, scope='class')
+    @classmethod
+    def log_in_with_airlock_manager_user(cls, app, airlock_manager_user):
         app.dependency_overrides[require_airlock_manager] = airlock_manager_user
         app.dependency_overrides[require_workspace_owner_or_researcher_or_airlock_manager] = airlock_manager_user
         with patch("services.airlock.AirlockRequestRepository.create_airlock_request_item", return_value=sample_airlock_request_object()), \
@@ -463,7 +466,7 @@ class TestAirlockRoutesThatRequireAirlockManagerRights():
 
 class TestAirlockRoutesPermissions():
 
-    @pytest_asyncio.fixture()
+    @pytest.fixture()
     def log_in_with_user(self, app):
         def inner(user):
             app.dependency_overrides[require_workspace_owner_or_researcher] = user

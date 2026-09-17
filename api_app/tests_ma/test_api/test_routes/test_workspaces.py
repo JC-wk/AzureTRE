@@ -95,7 +95,7 @@ def sample_workspace(workspace_id=WORKSPACE_ID, auth_info: dict = {}) -> Workspa
         },
         resourcePath=f'/workspaces/{workspace_id}',
         updatedWhen=FAKE_CREATE_TIMESTAMP,
-        user=create_admin_user()
+        user=create_admin_user().model_dump()
     )
     if auth_info:
         workspace.properties = {**auth_info}
@@ -141,7 +141,9 @@ def sample_resource_operation(resource_id: str, operation_id: str):
             OperationStep(
                 id="random-uuid",
                 templateStepId="main",
+                stepTitle="Main installation step",
                 resourceId=resource_id,
+                resourceType=ResourceType.Workspace,
                 resourceAction="install",
                 updatedWhen=FAKE_UPDATE_TIMESTAMP,
                 sourceTemplateResourceId=resource_id
@@ -181,7 +183,7 @@ def sample_workspace_service(workspace_service_id=SERVICE_ID, workspace_id=WORKS
         properties={},
         resourcePath=f'/workspaces/{workspace_id}/workspace-services/{workspace_service_id}',
         updatedWhen=FAKE_CREATE_TIMESTAMP,
-        user=create_workspace_owner_user()
+        user=create_workspace_owner_user().model_dump()
     )
 
 
@@ -196,7 +198,7 @@ def sample_user_resource_object(user_resource_id=USER_RESOURCE_ID, workspace_id=
         properties={},
         resourcePath=f'/workspaces/{workspace_id}/workspace-services/{parent_workspace_service_id}/user-resources/{user_resource_id}',
         updatedWhen=FAKE_CREATE_TIMESTAMP,
-        user=create_workspace_researcher_user()
+        user=create_workspace_researcher_user().model_dump()
     )
 
     return user_resource
@@ -250,7 +252,8 @@ def disabled_user_resource():
 
 class TestWorkspaceRoutesThatDontRequireAdminRights:
     @pytest.fixture(autouse=True, scope='class')
-    def log_in_with_non_admin_user(self, app, non_admin_user):
+    @classmethod
+    def log_in_with_non_admin_user(cls, app, non_admin_user):
         app.dependency_overrides[require_tre_user_or_admin] = non_admin_user
         yield
         app.dependency_overrides = {}
@@ -340,7 +343,7 @@ class TestWorkspaceRoutesThatDontRequireAdminRights:
             },
             resourcePath=f'/workspaces/{WORKSPACE_ID}',
             updatedWhen=FAKE_CREATE_TIMESTAMP,
-            user=create_admin_user()
+            user=create_admin_user().model_dump()
         )
 
         workspace_mock.return_value = no_scope_id_workspace
@@ -351,7 +354,8 @@ class TestWorkspaceRoutesThatDontRequireAdminRights:
 
 class TestWorkspaceRoutesThatRequireAdminRights:
     @pytest.fixture(autouse=True, scope='class')
-    def _prepare(self, app, admin_user):
+    @classmethod
+    def _prepare(cls, app, admin_user):
         app.dependency_overrides[require_workspace_owner_or_researcher_or_airlock_manager] = admin_user
         app.dependency_overrides[require_workspace_owner_or_researcher_or_airlock_manager_or_tre_admin] = admin_user
         app.dependency_overrides[require_workspace_owner_or_researcher] = admin_user
@@ -535,7 +539,7 @@ class TestWorkspaceRoutesThatRequireAdminRights:
 
         response = await client.patch(app.url_path_for(strings.API_UPDATE_WORKSPACE, workspace_id=WORKSPACE_ID), json=workspace_patch)
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
-        assert ("('header', 'etag')" in response.text and "field required" in response.text)
+        assert ("('header', 'etag')" in response.text and "field required" in response.text.lower())
 
     # [PATCH] /workspaces/{workspace_id}
     @patch("api.dependencies.workspaces.WorkspaceRepository.get_workspace_by_id", side_effect=EntityDoesNotExist)
@@ -558,7 +562,7 @@ class TestWorkspaceRoutesThatRequireAdminRights:
         modified_workspace = sample_workspace()
         modified_workspace.isEnabled = False
         modified_workspace.resourceVersion = 1
-        modified_workspace.user = create_admin_user()
+        modified_workspace.user = create_admin_user().model_dump()
         modified_workspace.updatedWhen = FAKE_UPDATE_TIMESTAMP
 
         response = await client.patch(app.url_path_for(strings.API_UPDATE_WORKSPACE, workspace_id=WORKSPACE_ID), json=workspace_patch, headers={"etag": etag})
@@ -581,7 +585,7 @@ class TestWorkspaceRoutesThatRequireAdminRights:
         modified_workspace = sample_workspace()
         modified_workspace.isEnabled = True
         modified_workspace.resourceVersion = 1
-        modified_workspace.user = create_admin_user()
+        modified_workspace.user = create_admin_user().model_dump()
         modified_workspace.updatedWhen = FAKE_UPDATE_TIMESTAMP
 
         response = await client.patch(app.url_path_for(strings.API_UPDATE_WORKSPACE, workspace_id=WORKSPACE_ID), json=workspace_patch, headers={"etag": etag})
@@ -604,7 +608,7 @@ class TestWorkspaceRoutesThatRequireAdminRights:
         modified_workspace = sample_workspace()
         modified_workspace.isEnabled = True
         modified_workspace.resourceVersion = 1
-        modified_workspace.user = create_admin_user()
+        modified_workspace.user = create_admin_user().model_dump()
         modified_workspace.updatedWhen = FAKE_UPDATE_TIMESTAMP
         modified_workspace.templateVersion = "2.0.0"
 
@@ -628,7 +632,7 @@ class TestWorkspaceRoutesThatRequireAdminRights:
         modified_workspace = sample_workspace()
         modified_workspace.isEnabled = True
         modified_workspace.resourceVersion = 1
-        modified_workspace.user = create_admin_user()
+        modified_workspace.user = create_admin_user().model_dump()
         modified_workspace.updatedWhen = FAKE_UPDATE_TIMESTAMP
 
         response = await client.patch(app.url_path_for(strings.API_UPDATE_WORKSPACE, workspace_id=WORKSPACE_ID), json=workspace_patch, headers={"etag": etag})
@@ -651,7 +655,7 @@ class TestWorkspaceRoutesThatRequireAdminRights:
         modified_workspace = sample_workspace()
         modified_workspace.isEnabled = True
         modified_workspace.resourceVersion = 1
-        modified_workspace.user = create_admin_user()
+        modified_workspace.user = create_admin_user().model_dump()
         modified_workspace.updatedWhen = FAKE_UPDATE_TIMESTAMP
         modified_workspace.templateVersion = "0.2.0"
 
@@ -673,7 +677,7 @@ class TestWorkspaceRoutesThatRequireAdminRights:
         modified_workspace = sample_workspace()
         modified_workspace.isEnabled = False
         modified_workspace.resourceVersion = 1
-        modified_workspace.user = create_admin_user()
+        modified_workspace.user = create_admin_user().model_dump()
         modified_workspace.updatedWhen = FAKE_UPDATE_TIMESTAMP
 
         response = await client.patch(app.url_path_for(strings.API_UPDATE_WORKSPACE, workspace_id=WORKSPACE_ID), json=workspace_patch, headers={"etag": etag})
@@ -736,7 +740,8 @@ class TestWorkspaceRoutesThatRequireAdminRights:
 
 class TestWorkspaceServiceRoutesThatRequireOwnerRights:
     @pytest.fixture(autouse=True, scope='class')
-    def log_in_with_owner_user(self, app, owner_user):
+    @classmethod
+    def log_in_with_owner_user(cls, app, owner_user):
         # The following ws services requires the WS app registration
         app.dependency_overrides[require_workspace_owner] = owner_user
         app.dependency_overrides[require_workspace_owner_or_tre_admin] = owner_user
@@ -789,7 +794,7 @@ class TestWorkspaceServiceRoutesThatRequireOwnerRights:
         modified_workspace = sample_workspace()
         modified_workspace.isEnabled = True
         modified_workspace.resourceVersion = 1
-        modified_workspace.user = create_workspace_owner_user()
+        modified_workspace.user = create_workspace_owner_user().model_dump()
         modified_workspace.updatedWhen = FAKE_UPDATE_TIMESTAMP
         modified_workspace.properties["address_spaces"] = ["192.168.0.1/24", "10.1.4.0/24"]
         modified_workspace.etag = etag
@@ -1052,7 +1057,7 @@ class TestWorkspaceServiceRoutesThatRequireOwnerRights:
         modified_user_resource.isEnabled = False
         modified_user_resource.resourceVersion = 1
         modified_user_resource.updatedWhen = FAKE_UPDATE_TIMESTAMP
-        modified_user_resource.user = create_workspace_owner_user()
+        modified_user_resource.user = create_workspace_owner_user().model_dump()
 
         response = await client.patch(app.url_path_for(strings.API_UPDATE_USER_RESOURCE, workspace_id=WORKSPACE_ID, service_id=SERVICE_ID, resource_id=USER_RESOURCE_ID), json=user_resource_service_patch, headers={"etag": etag})
 
@@ -1078,7 +1083,7 @@ class TestWorkspaceServiceRoutesThatRequireOwnerRights:
         modified_user_resource.isEnabled = True
         modified_user_resource.resourceVersion = 1
         modified_user_resource.updatedWhen = FAKE_UPDATE_TIMESTAMP
-        modified_user_resource.user = create_workspace_owner_user()
+        modified_user_resource.user = create_workspace_owner_user().model_dump()
 
         response = await client.patch(app.url_path_for(strings.API_UPDATE_USER_RESOURCE, workspace_id=WORKSPACE_ID, service_id=SERVICE_ID, resource_id=USER_RESOURCE_ID), json=user_resource_service_patch, headers={"etag": etag})
 
@@ -1105,7 +1110,7 @@ class TestWorkspaceServiceRoutesThatRequireOwnerRights:
         modified_user_resource.isEnabled = True
         modified_user_resource.resourceVersion = 1
         modified_user_resource.updatedWhen = FAKE_UPDATE_TIMESTAMP
-        modified_user_resource.user = create_workspace_owner_user()
+        modified_user_resource.user = create_workspace_owner_user().model_dump()
         modified_user_resource.templateVersion = "2.0.0"
 
         response = await client.patch(app.url_path_for(strings.API_UPDATE_USER_RESOURCE, workspace_id=WORKSPACE_ID, service_id=SERVICE_ID, resource_id=USER_RESOURCE_ID) + "?force_version_update=True", json=user_resource_service_patch, headers={"etag": etag})
@@ -1133,7 +1138,7 @@ class TestWorkspaceServiceRoutesThatRequireOwnerRights:
         modified_user_resource.isEnabled = True
         modified_user_resource.resourceVersion = 1
         modified_user_resource.updatedWhen = FAKE_UPDATE_TIMESTAMP
-        modified_user_resource.user = create_workspace_owner_user()
+        modified_user_resource.user = create_workspace_owner_user().model_dump()
 
         response = await client.patch(app.url_path_for(strings.API_UPDATE_USER_RESOURCE, workspace_id=WORKSPACE_ID, service_id=SERVICE_ID, resource_id=USER_RESOURCE_ID), json=user_resource_service_patch, headers={"etag": etag})
 
@@ -1160,7 +1165,7 @@ class TestWorkspaceServiceRoutesThatRequireOwnerRights:
         modified_user_resource.isEnabled = True
         modified_user_resource.resourceVersion = 1
         modified_user_resource.updatedWhen = FAKE_UPDATE_TIMESTAMP
-        modified_user_resource.user = create_workspace_owner_user()
+        modified_user_resource.user = create_workspace_owner_user().model_dump()
         modified_user_resource.templateVersion = "0.2.0"
 
         response = await client.patch(app.url_path_for(strings.API_UPDATE_USER_RESOURCE, workspace_id=WORKSPACE_ID, service_id=SERVICE_ID, resource_id=USER_RESOURCE_ID), json=user_resource_service_patch, headers={"etag": etag})
@@ -1188,7 +1193,7 @@ class TestWorkspaceServiceRoutesThatRequireOwnerRights:
         modified_resource.resourceVersion = 1
         modified_resource.properties["vm_size"] = "large"
         modified_resource.updatedWhen = FAKE_UPDATE_TIMESTAMP
-        modified_resource.user = create_workspace_owner_user()
+        modified_resource.user = create_workspace_owner_user().model_dump()
 
         response = await client.patch(app.url_path_for(strings.API_UPDATE_USER_RESOURCE, workspace_id=WORKSPACE_ID, service_id=SERVICE_ID, resource_id=USER_RESOURCE_ID), json=user_resource_service_patch, headers={"etag": etag})
 
@@ -1266,7 +1271,7 @@ class TestWorkspaceServiceRoutesThatRequireOwnerRights:
         modified_workspace_service = sample_workspace_service()
         modified_workspace_service.isEnabled = False
         modified_workspace_service.resourceVersion = 1
-        modified_workspace_service.user = create_workspace_owner_user()
+        modified_workspace_service.user = create_workspace_owner_user().model_dump()
         modified_workspace_service.updatedWhen = FAKE_UPDATE_TIMESTAMP
 
         response = await client.patch(app.url_path_for(strings.API_UPDATE_WORKSPACE_SERVICE, workspace_id=WORKSPACE_ID, service_id=SERVICE_ID), json=workspace_service_patch, headers={"etag": etag})
@@ -1293,7 +1298,7 @@ class TestWorkspaceServiceRoutesThatRequireOwnerRights:
         modified_workspace_service = sample_workspace_service()
         modified_workspace_service.isEnabled = True
         modified_workspace_service.resourceVersion = 1
-        modified_workspace_service.user = create_workspace_owner_user()
+        modified_workspace_service.user = create_workspace_owner_user().model_dump()
         modified_workspace_service.updatedWhen = FAKE_UPDATE_TIMESTAMP
 
         response = await client.patch(app.url_path_for(strings.API_UPDATE_WORKSPACE_SERVICE, workspace_id=WORKSPACE_ID, service_id=SERVICE_ID), json=workspace_service_patch, headers={"etag": etag})
@@ -1319,7 +1324,7 @@ class TestWorkspaceServiceRoutesThatRequireOwnerRights:
         modified_workspace_service = sample_workspace_service()
         modified_workspace_service.isEnabled = True
         modified_workspace_service.resourceVersion = 1
-        modified_workspace_service.user = create_workspace_owner_user()
+        modified_workspace_service.user = create_workspace_owner_user().model_dump()
         modified_workspace_service.updatedWhen = FAKE_UPDATE_TIMESTAMP
         modified_workspace_service.templateVersion = "2.0.0"
 
@@ -1347,7 +1352,7 @@ class TestWorkspaceServiceRoutesThatRequireOwnerRights:
         modified_workspace_service = sample_workspace_service()
         modified_workspace_service.isEnabled = True
         modified_workspace_service.resourceVersion = 1
-        modified_workspace_service.user = create_workspace_owner_user()
+        modified_workspace_service.user = create_workspace_owner_user().model_dump()
         modified_workspace_service.updatedWhen = FAKE_UPDATE_TIMESTAMP
 
         response = await client.patch(app.url_path_for(strings.API_UPDATE_WORKSPACE_SERVICE, workspace_id=WORKSPACE_ID, service_id=SERVICE_ID), json=workspace_service_patch, headers={"etag": etag})
@@ -1374,7 +1379,7 @@ class TestWorkspaceServiceRoutesThatRequireOwnerRights:
         modified_workspace_service = sample_workspace_service()
         modified_workspace_service.isEnabled = True
         modified_workspace_service.resourceVersion = 1
-        modified_workspace_service.user = create_workspace_owner_user()
+        modified_workspace_service.user = create_workspace_owner_user().model_dump()
         modified_workspace_service.updatedWhen = FAKE_UPDATE_TIMESTAMP
         modified_workspace_service.templateVersion = "0.2.0"
 
@@ -1386,7 +1391,8 @@ class TestWorkspaceServiceRoutesThatRequireOwnerRights:
 
 class TestWorkspaceServiceRoutesThatRequireOwnerOrResearcherRights:
     @pytest.fixture(autouse=True, scope='class')
-    def log_in_with_researcher_user(self, app, researcher_user):
+    @classmethod
+    def log_in_with_researcher_user(cls, app, researcher_user):
         # The following ws services requires the WS app registration
         app.dependency_overrides[require_workspace_owner_or_researcher_or_airlock_manager] = researcher_user
         app.dependency_overrides[require_workspace_owner_or_researcher_or_airlock_manager_or_tre_admin] = researcher_user
@@ -1680,7 +1686,7 @@ class TestWorkspaceServiceRoutesThatRequireOwnerOrResearcherRights:
         modified_user_resource.isEnabled = False
         modified_user_resource.resourceVersion = 1
         modified_user_resource.updatedWhen = FAKE_UPDATE_TIMESTAMP
-        modified_user_resource.user = create_workspace_researcher_user()
+        modified_user_resource.user = create_workspace_researcher_user().model_dump()
 
         response = await client.patch(app.url_path_for(strings.API_UPDATE_USER_RESOURCE, workspace_id=WORKSPACE_ID, service_id=SERVICE_ID, resource_id=USER_RESOURCE_ID), json=user_resource_service_patch, headers={"etag": etag})
 
