@@ -293,3 +293,140 @@ async def test_create_template_with_null_pipeline_creates_template_without_pipel
     input_user_resource_template.json_schema["pipeline"] = None
     created = await resource_template_repo.create_template(input_user_resource_template, ResourceType.UserResource)
     assert created.pipeline is None
+
+
+# Tests for get_all_templates
+@patch('db.repositories.resource_templates.ResourceTemplateRepository.query')
+async def test_get_all_templates_queries_db_with_correct_query(query_mock, resource_template_repo):
+    expected_query = 'SELECT c.id, c.name, c.title, c.description, c.version, c.resourceType, c.current FROM c'
+    query_mock.return_value = []
+
+    await resource_template_repo.get_all_templates()
+
+    query_mock.assert_called_once_with(query=expected_query)
+
+
+@patch('db.repositories.resource_templates.ResourceTemplateRepository.query')
+async def test_get_all_templates_returns_all_templates(query_mock, resource_template_repo):
+    expected_templates = [
+        {
+            "id": "template-1-id",
+            "name": "template1",
+            "title": "Template 1",
+            "description": "Description 1",
+            "version": "1.0.0",
+            "resourceType": ResourceType.Workspace,
+            "current": True
+        },
+        {
+            "id": "template-2-id",
+            "name": "template1",
+            "title": "Template 1",
+            "description": "Description 1",
+            "version": "2.0.0",
+            "resourceType": ResourceType.Workspace,
+            "current": False
+        },
+        {
+            "id": "template-3-id",
+            "name": "template2",
+            "title": "Template 2",
+            "description": "Description 2",
+            "version": "1.0.0",
+            "resourceType": ResourceType.SharedService,
+            "current": True
+        }
+    ]
+    query_mock.return_value = expected_templates
+
+    result = await resource_template_repo.get_all_templates()
+
+    assert len(result) == 3
+    assert result == expected_templates
+
+
+@patch('db.repositories.resource_templates.ResourceTemplateRepository.query')
+async def test_get_all_templates_returns_empty_list_when_no_templates(query_mock, resource_template_repo):
+    query_mock.return_value = []
+
+    result = await resource_template_repo.get_all_templates()
+
+    assert result == []
+
+
+# Tests for delete_template_by_id
+@patch('db.repositories.resource_templates.ResourceTemplateRepository.delete_item')
+async def test_delete_template_by_id_calls_delete_item(delete_item_mock, resource_template_repo):
+    template_id = "test-template-id"
+
+    await resource_template_repo.delete_template_by_id(template_id)
+
+    delete_item_mock.assert_called_once_with(template_id)
+
+
+# Tests for delete_templates_by_name
+@patch('db.repositories.resource_templates.ResourceTemplateRepository.delete_item')
+@patch('db.repositories.resource_templates.ResourceTemplateRepository.query')
+async def test_delete_templates_by_name_queries_db_with_correct_parameters(query_mock, delete_item_mock, resource_template_repo):
+    template_name = "test-template"
+    resource_type = ResourceType.Workspace
+    expected_query = 'SELECT * FROM c WHERE c.resourceType = @resourceType AND c.name = @name'
+    expected_parameters = [
+        {'name': '@resourceType', 'value': resource_type},
+        {'name': '@name', 'value': template_name}
+    ]
+    query_mock.return_value = []
+
+    await resource_template_repo.delete_templates_by_name(template_name, resource_type)
+
+    query_mock.assert_called_once_with(query=expected_query, parameters=expected_parameters)
+
+
+@patch('db.repositories.resource_templates.ResourceTemplateRepository.delete_item')
+@patch('db.repositories.resource_templates.ResourceTemplateRepository.query')
+async def test_delete_templates_by_name_deletes_all_matching_templates(query_mock, delete_item_mock, resource_template_repo):
+    template_name = "test-template"
+    resource_type = ResourceType.Workspace
+    templates = [
+        {"id": "template-1-id", "name": template_name, "version": "1.0.0"},
+        {"id": "template-2-id", "name": template_name, "version": "2.0.0"},
+        {"id": "template-3-id", "name": template_name, "version": "3.0.0"}
+    ]
+    query_mock.return_value = templates
+
+    result = await resource_template_repo.delete_templates_by_name(template_name, resource_type)
+
+    assert delete_item_mock.call_count == 3
+    delete_item_mock.assert_any_call("template-1-id")
+    delete_item_mock.assert_any_call("template-2-id")
+    delete_item_mock.assert_any_call("template-3-id")
+    assert result == 3
+
+
+@patch('db.repositories.resource_templates.ResourceTemplateRepository.delete_item')
+@patch('db.repositories.resource_templates.ResourceTemplateRepository.query')
+async def test_delete_templates_by_name_returns_zero_when_no_matching_templates(query_mock, delete_item_mock, resource_template_repo):
+    template_name = "non-existent-template"
+    resource_type = ResourceType.Workspace
+    query_mock.return_value = []
+
+    result = await resource_template_repo.delete_templates_by_name(template_name, resource_type)
+
+    delete_item_mock.assert_not_called()
+    assert result == 0
+
+
+@patch('db.repositories.resource_templates.ResourceTemplateRepository.delete_item')
+@patch('db.repositories.resource_templates.ResourceTemplateRepository.query')
+async def test_delete_templates_by_name_returns_correct_count(query_mock, delete_item_mock, resource_template_repo):
+    template_name = "test-template"
+    resource_type = ResourceType.SharedService
+    templates = [
+        {"id": "template-1-id", "name": template_name, "version": "1.0.0"},
+        {"id": "template-2-id", "name": template_name, "version": "1.5.0"}
+    ]
+    query_mock.return_value = templates
+
+    result = await resource_template_repo.delete_templates_by_name(template_name, resource_type)
+
+    assert result == 2
