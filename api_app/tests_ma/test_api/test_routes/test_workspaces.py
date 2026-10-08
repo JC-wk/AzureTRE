@@ -1,4 +1,5 @@
 import random
+import threading
 from unittest.mock import AsyncMock
 import uuid
 from pydantic import Field
@@ -12,7 +13,7 @@ from tests_ma.test_api.conftest import create_admin_user, create_test_user, crea
 from models.domain.resource_template import ResourceTemplate
 from models.schemas.operation import OperationInResponse
 
-from db.errors import EntityDoesNotExist, StorageAccountNameGenerationTimeout, StorageAccountNameCheckFailed
+from db.errors import EntityDoesNotExist, InvalidInput, StorageAccountNameGenerationTimeout, StorageAccountNameCheckFailed
 from db.repositories.workspaces import WorkspaceRepository
 from db.repositories.workspace_services import WorkspaceServiceRepository
 from models.domain.authentication import RoleAssignment
@@ -91,7 +92,11 @@ def sample_workspace(workspace_id=WORKSPACE_ID, auth_info: dict = {}) -> Workspa
         properties={
             "client_id": "12345",
             "scope_id": "test_scope_id",
-            "sp_id": "test_sp_id"
+            "sp_id": "test_sp_id",
+            "display_name": "Test Name",
+            "description": "desc here",
+            "title": "Test Title",
+            "os_image": "Windows 11"
         },
         resourcePath=f'/workspaces/{workspace_id}',
         updatedWhen=FAKE_CREATE_TIMESTAMP,
@@ -164,12 +169,12 @@ def sample_deployed_workspace(workspace_id=WORKSPACE_ID, authInfo={}):
         templateName="tre-workspace-base",
         templateVersion="0.1.0",
         etag="",
-        properties={},
+        properties={'display_name': 'Test Name', 'description': 'desc here', 'title': 'Test Title', 'os_image': 'Windows 11'},
         resourcePath="test",
         updatedWhen=FAKE_CREATE_TIMESTAMP
     )
     if authInfo:
-        workspace.properties = {**authInfo}
+        workspace.properties.update(authInfo)
     return workspace
 
 
@@ -180,7 +185,7 @@ def sample_workspace_service(workspace_service_id=SERVICE_ID, workspace_id=WORKS
         templateName="tre-workspace-base",
         templateVersion="0.1.0",
         etag="",
-        properties={},
+        properties={'display_name': 'Test Name', 'description': 'desc here', 'title': 'Test Title', 'os_image': 'Windows 11'},
         resourcePath=f'/workspaces/{workspace_id}/workspace-services/{workspace_service_id}',
         updatedWhen=FAKE_CREATE_TIMESTAMP,
         user=create_workspace_owner_user().model_dump()
@@ -195,7 +200,7 @@ def sample_user_resource_object(user_resource_id=USER_RESOURCE_ID, workspace_id=
         templateName="tre-user-resource",
         templateVersion="0.1.0",
         etag="",
-        properties={},
+        properties={'display_name': 'Test Name', 'description': 'desc here', 'title': 'Test Title', 'os_image': 'Windows 11'},
         resourcePath=f'/workspaces/{workspace_id}/workspace-services/{parent_workspace_service_id}/user-resources/{user_resource_id}',
         updatedWhen=FAKE_CREATE_TIMESTAMP,
         user=create_workspace_researcher_user().model_dump()
@@ -213,6 +218,14 @@ def sample_resource_template() -> ResourceTemplate:
                             current=True,
                             required=['os_image', 'title'],
                             properties={
+                                'display_name': {
+                                    'type': 'string',
+                                    'title': 'Display Name'
+                                },
+                                'description': {
+                                    'type': 'string',
+                                    'title': 'Description'
+                                },
                                 'title': {
                                     'type': 'string',
                                     'title': 'Title of the resource'
@@ -237,6 +250,30 @@ def sample_resource_template() -> ResourceTemplate:
                                         'large'
                                     ],
                                     'updateable': True
+                                },
+                                'overview': {
+                                    'type': 'string',
+                                    'title': 'Overview'
+                                },
+                                'private_field_1': {
+                                    'type': 'string',
+                                    'title': 'Private Field 1'
+                                },
+                                'private_field_2': {
+                                    'type': 'string',
+                                    'title': 'Private Field 2'
+                                },
+                                'client_id': {
+                                    'type': 'string',
+                                    'title': 'Client ID'
+                                },
+                                'scope_id': {
+                                    'type': 'string',
+                                    'title': 'Scope ID'
+                                },
+                                'sp_id': {
+                                    'type': 'string',
+                                    'title': 'SP ID'
                                 }
                             },
                             actions=[])
@@ -271,7 +308,7 @@ class TestWorkspaceRoutesThatDontRequireAdminRights:
     # [GET] /workspaces
     @patch("api.routes.workspaces.WorkspaceRepository.get_active_workspaces")
     @patch("api.routes.workspaces.get_identity_role_assignments")
-    @patch("api.routes.workspaces.enrich_resource_with_available_upgrades", return_value=None)
+    @patch("api.routes.workspaces.enrich_resources_with_available_upgrades", return_value=None)
     async def test_get_workspaces_returns_correct_data_when_resources_exist(self, _, access_service_mock, get_workspaces_mock, app, client) -> None:
         auth_info_user_in_workspace_owner_role = {'sp_id': 'ab123', 'app_role_id_workspace_owner': 'ab124', 'app_role_id_workspace_researcher': 'ab125', 'app_role_id_workspace_airlock_manager': 'ab130'}
         auth_info_user_in_workspace_researcher_role = {'sp_id': 'ab123', 'app_role_id_workspace_owner': 'ab127', 'app_role_id_workspace_researcher': 'ab126', 'app_role_id_workspace_airlock_manager': 'ab130'}
@@ -370,7 +407,7 @@ class TestWorkspaceRoutesThatRequireAdminRights:
 
     # [GET] /workspaces
     @patch("api.routes.workspaces.WorkspaceRepository.get_active_workspaces")
-    @patch("api.routes.workspaces.enrich_resource_with_available_upgrades", return_value=None)
+    @patch("api.routes.workspaces.enrich_resources_with_available_upgrades", return_value=None)
     async def test_get_workspaces_returns_correct_data_when_resources_exist(self, _, get_workspaces_mock, app, client) -> None:
         auth_info_user_in_workspace_owner_role = {'sp_id': 'ab123', 'roles': {'WorkspaceOwner': 'ab124', 'WorkspaceResearcher': 'ab125'}}
         auth_info_user_in_workspace_researcher_role = {'sp_id': 'ab123', 'roles': {'WorkspaceOwner': 'ab127', 'WorkspaceResearcher': 'ab126'}}
@@ -624,7 +661,7 @@ class TestWorkspaceRoutesThatRequireAdminRights:
     @patch("api.routes.workspaces.send_resource_request_message", return_value=sample_resource_operation(resource_id=WORKSPACE_ID, operation_id=OPERATION_ID))
     @patch("api.dependencies.workspaces.WorkspaceRepository.get_workspace_by_id", return_value=sample_workspace())
     @patch("api.routes.workspaces.WorkspaceRepository.update_item_with_etag", return_value=sample_workspace())
-    @patch("api.routes.workspaces.ResourceTemplateRepository.get_template_by_name_and_version", return_value=sample_workspace())
+    @patch("api.routes.workspaces.ResourceTemplateRepository.get_template_by_name_and_version", return_value=sample_resource_template())
     @patch("api.routes.workspaces.WorkspaceRepository.get_timestamp", return_value=FAKE_UPDATE_TIMESTAMP)
     async def test_patch_workspaces_with_upgrade_major_version_and_force_update_returns_patched_workspace(self, _, __, update_item_mock, ___, ____, _____, ______, app, client):
         workspace_patch = {"templateVersion": "2.0.0"}
@@ -671,7 +708,7 @@ class TestWorkspaceRoutesThatRequireAdminRights:
     @patch("api.routes.workspaces.send_resource_request_message", return_value=sample_resource_operation(resource_id=WORKSPACE_ID, operation_id=OPERATION_ID))
     @patch("api.dependencies.workspaces.WorkspaceRepository.get_workspace_by_id", return_value=sample_workspace())
     @patch("api.routes.workspaces.WorkspaceRepository.update_item_with_etag", return_value=sample_workspace())
-    @patch("api.routes.workspaces.ResourceTemplateRepository.get_template_by_name_and_version", return_value=sample_workspace())
+    @patch("api.routes.workspaces.ResourceTemplateRepository.get_template_by_name_and_version", return_value=sample_resource_template())
     @patch("api.routes.workspaces.WorkspaceRepository.get_timestamp", return_value=FAKE_UPDATE_TIMESTAMP)
     async def test_patch_workspaces_with_upgrade_minor_version_patches_workspace(self, _, __, update_item_mock, ___, ____, _____, ______, app, client):
         workspace_patch = {"templateVersion": "0.2.0"}
@@ -685,7 +722,6 @@ class TestWorkspaceRoutesThatRequireAdminRights:
         modified_workspace.templateVersion = "0.2.0"
 
         response = await client.patch(app.url_path_for(strings.API_UPDATE_WORKSPACE, workspace_id=WORKSPACE_ID), json=workspace_patch, headers={"etag": etag})
-
         update_item_mock.assert_called_once_with(modified_workspace, etag)
         assert response.status_code == status.HTTP_202_ACCEPTED
 
@@ -832,6 +868,24 @@ class TestWorkspaceServiceRoutesThatRequireOwnerRights:
         assert response.json()["operation"]["resourceId"] == SERVICE_ID
 
     # [POST] /workspaces/{workspace_id}/workspace-services
+    @patch("api.dependencies.workspaces.WorkspaceRepository.get_address_space_based_on_size", side_effect=InvalidInput("'address_space_size' numeric value must be between 16 and 29"))
+    @patch("api.dependencies.workspaces.WorkspaceRepository.get_workspace_by_id")
+    @patch("api.routes.workspaces.OperationRepository.resource_has_deployed_operation", return_value=True)
+    @patch("api.routes.workspaces.WorkspaceServiceRepository.create_workspace_service_item")
+    async def test_post_workspace_services_returns_422_for_invalid_address_space_size(self, create_workspace_service_item_mock, _, get_workspace_mock, __, app, client, workspace_service_input, basic_workspace_service_template):
+        workspace = sample_workspace()
+        workspace.properties["address_spaces"] = ["192.168.0.1/24"]
+        get_workspace_mock.return_value = workspace
+        basic_workspace_service_template.properties["address_space"] = "10.1.0.0/24"
+        create_workspace_service_item_mock.return_value = [sample_workspace_service(), basic_workspace_service_template]
+        workspace_service_input["properties"]["address_space_size"] = "15"
+
+        response = await client.post(app.url_path_for(strings.API_CREATE_WORKSPACE_SERVICE, workspace_id=WORKSPACE_ID), json=workspace_service_input)
+
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+        assert response.text == "'address_space_size' numeric value must be between 16 and 29"
+
+    # [POST] /workspaces/{workspace_id}/workspace-services
     @patch("api.dependencies.workspaces.WorkspaceRepository.get_new_address_space", return_value="10.1.4.0/24")
     @patch("api.routes.workspaces.ResourceTemplateRepository.get_template_by_name_and_version")
     @patch("api.dependencies.workspaces.WorkspaceRepository.get_workspace_by_id")
@@ -961,7 +1015,7 @@ class TestWorkspaceServiceRoutesThatRequireOwnerRights:
         assert response.json()["operation"]["resourceId"] == workspace_service.id
 
     # GET /workspaces/{workspace_id}/workspace-services/{service_id}/user-resources
-    @patch("api.routes.workspaces.enrich_resource_with_available_upgrades", return_value=None)
+    @patch("api.routes.workspaces.enrich_resources_with_available_upgrades", return_value=None)
     @patch("api.dependencies.workspaces.WorkspaceRepository.get_workspace_by_id")
     @patch("api.routes.workspaces.UserResourceRepository.get_user_resources_for_workspace_service")
     async def test_get_user_resources_returns_all_user_resources_for_workspace_service_if_owner(self, get_user_resources_mock, _, __, app, client):
@@ -976,6 +1030,39 @@ class TestWorkspaceServiceRoutesThatRequireOwnerRights:
         assert response.status_code == status.HTTP_200_OK
         assert response.json()["userResources"][0]["id"] == user_resources[0].id
         assert response.json()["userResources"][1]["id"] == user_resources[1].id
+
+    @patch("api.routes.workspaces.get_azure_resource_status")
+    @patch("api.routes.workspaces.enrich_resources_with_available_upgrades", return_value=None)
+    @patch("api.dependencies.workspaces.WorkspaceRepository.get_workspace_by_id")
+    @patch("api.routes.workspaces.UserResourceRepository.get_user_resources_for_workspace_service")
+    async def test_get_user_resources_queries_azure_status_concurrently(self, get_user_resources_mock, _, __, get_azure_resource_status_mock, app, client):
+        user_resources = [
+            sample_user_resource_object(user_resource_id="a33ad738-7265-4b5f-9eae-a1a62928772a"),
+            sample_user_resource_object(user_resource_id="b33ad738-7265-4b5f-9eae-a1a62928772a"),
+            sample_user_resource_object(user_resource_id="c33ad738-7265-4b5f-9eae-a1a62928772a"),
+        ]
+        user_resources[0].properties = {"azure_resource_id": "vm-a"}
+        user_resources[1].properties = {"azure_resource_id": "vm-b"}
+        get_user_resources_mock.return_value = user_resources
+
+        # both lookups must be in flight at the same time to pass the barrier
+        barrier = threading.Barrier(2, timeout=5)
+
+        def get_status(resource_id):
+            barrier.wait()
+            return {"powerState": f"{resource_id} running"}
+
+        get_azure_resource_status_mock.side_effect = get_status
+
+        response = await client.get(app.url_path_for(strings.API_GET_MY_USER_RESOURCES, workspace_id=WORKSPACE_ID, service_id=SERVICE_ID))
+
+        assert response.status_code == status.HTTP_200_OK
+        assert [r["azureStatus"] for r in response.json()["userResources"]] == [
+            {"powerState": "vm-a running"},
+            {"powerState": "vm-b running"},
+            {},
+        ]
+        assert get_azure_resource_status_mock.call_count == 2
 
     # GET /workspaces/{workspace_id}/workspace-services/{service_id}/user-resources/{resource_id}
     @patch("api.routes.workspaces.enrich_resource_with_available_upgrades", return_value=None)
@@ -1445,7 +1532,7 @@ class TestWorkspaceServiceRoutesThatRequireOwnerOrResearcherRights:
         assert response.status_code == status.HTTP_200_OK
 
     # [GET] /workspaces/{workspace_id}/workspace-services
-    @patch("api.routes.workspaces.enrich_resource_with_available_upgrades", return_value=None)
+    @patch("api.routes.workspaces.enrich_resources_with_available_upgrades", return_value=None)
     @patch("api.dependencies.workspaces.WorkspaceRepository.get_workspace_by_id", return_value=sample_workspace())
     @patch("api.routes.workspaces.WorkspaceServiceRepository.get_active_workspace_services_for_workspace",
            return_value=None)
@@ -1501,7 +1588,7 @@ class TestWorkspaceServiceRoutesThatRequireOwnerOrResearcherRights:
                              service_id=SERVICE_ID))
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
-    @patch("api.routes.workspaces.enrich_resource_with_available_upgrades", return_value=None)
+    @patch("api.routes.workspaces.enrich_resources_with_available_upgrades", return_value=None)
     @patch("api.dependencies.workspaces.WorkspaceRepository.get_workspace_by_id")
     @patch("api.routes.workspaces.UserResourceRepository.get_user_resources_for_workspace_service")
     async def test_get_user_resources_returns_own_user_resources_for_researcher(self, get_user_resources_mock_awaited_mock, _, __, app, client, non_admin_user):
